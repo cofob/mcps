@@ -1,0 +1,11 @@
+services:
+  navidrome-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/navidrome.Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      NAVIDROME_URL: "https://navidrome.example.com"
+      NAVIDROME_USERNAME: "alice"
+      NAVIDROME_PASSWORD: "secret"

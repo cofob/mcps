@@ -1,0 +1,11 @@
+services:
+  filesystem-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/filesystem.Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      FILESYSTEM_ROOT_DIR: "/workspace"
+    volumes:
+      - ../../local/filesystem:/workspace

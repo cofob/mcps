@@ -16,10 +16,14 @@ FROM python:3.12-slim AS runtime
 WORKDIR /app
 COPY --from=builder /app /app
 
+RUN useradd --create-home --home-dir /home/appuser --shell /usr/sbin/nologin --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+
 ENV HOST=0.0.0.0
 ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["uv", "run", "--package", "navidrome-mcp", "navidrome-mcp"]
+USER appuser
 
+CMD ["/app/.venv/bin/navidrome-mcp"]
