@@ -8,6 +8,10 @@ from mcp_common import BaseServiceSettings, ToolSettings
 
 class FilesystemSettings(BaseServiceSettings):
     filesystem_root_dir: Path = Field(alias="FILESYSTEM_ROOT_DIR")
+    ignore_patterns: list[str] = Field(
+        default_factory=list,
+        alias="FILESYSTEM_IGNORE_PATTERNS",
+    )
     max_inline_size: int = Field(default=5 * 1024 * 1024, alias="FILESYSTEM_MAX_INLINE_SIZE")
     max_base64_size: int = Field(default=1 * 1024 * 1024, alias="FILESYSTEM_MAX_BASE64_SIZE")
     max_search_results: int = Field(default=1000, alias="FILESYSTEM_MAX_SEARCH_RESULTS")

@@ -47,8 +47,9 @@ class SearchFileMatch:
 class SearchWithinMatch:
     path: str
     absolute_path: str
-    line_number: int
+    line_number: int | None
     line_content: str
+    match_type: str
 
 
 @dataclass(frozen=True)

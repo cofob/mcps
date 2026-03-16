@@ -44,6 +44,12 @@ class FilesystemService:
     def __init__(self, settings: FilesystemSettings) -> None:
         self._settings = settings
         self._root_dir = settings.filesystem_root_dir
+        self._ignore_patterns = [
+            pattern.strip()
+            for pattern in settings.ignore_patterns
+            if pattern.strip() and not pattern.strip().startswith("#")
+        ]
+        self._gitignore_cache: dict[Path, list[str]] = {}
 
     @property
     def root_dir(self) -> Path:
@@ -83,6 +89,117 @@ class FilesystemService:
     def _assert_within_root(self, path: Path) -> None:
         if not path.is_relative_to(self._root_dir):
             raise ValueError(f"Access denied outside root directory: {path}")
+        if self._is_excluded_path(path):
+            raise ValueError(f"Access denied for excluded path: {self.display_path(path)}")
+
+    def _is_excluded_path(self, path: Path) -> bool:
+        if path == self._root_dir:
+            return False
+        ignored = False
+        if self._matches_ignore_patterns(path, self._root_dir, self._ignore_patterns):
+            ignored = True
+
+        for base_dir, patterns in self._iter_gitignore_sources(path):
+            if self._matches_ignore_patterns(path, base_dir, patterns):
+                ignored = True
+        return ignored
+
+    def _iter_gitignore_sources(self, path: Path) -> list[tuple[Path, list[str]]]:
+        sources: list[tuple[Path, list[str]]] = []
+        relative_path = path.relative_to(self._root_dir)
+        current_dir = self._root_dir
+        sources.append((current_dir, self._read_gitignore_patterns(current_dir)))
+        for part in relative_path.parts[:-1]:
+            current_dir = current_dir / part
+            sources.append((current_dir, self._read_gitignore_patterns(current_dir)))
+        if path.is_dir() and path != self._root_dir:
+            sources.append((path, self._read_gitignore_patterns(path)))
+        return sources
+
+    def _read_gitignore_patterns(self, directory: Path) -> list[str]:
+        cached = self._gitignore_cache.get(directory)
+        if cached is not None:
+            return cached
+        gitignore_path = directory / ".gitignore"
+        if not gitignore_path.exists() or not gitignore_path.is_file():
+            self._gitignore_cache[directory] = []
+            return []
+        patterns = [
+            line.strip()
+            for line in gitignore_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self._gitignore_cache[directory] = patterns
+        return patterns
+
+    def _matches_ignore_patterns(
+        self,
+        path: Path,
+        base_dir: Path,
+        patterns: Sequence[str],
+    ) -> bool:
+        if not path.is_relative_to(base_dir):
+            return False
+        ignored = False
+        candidate = path.relative_to(base_dir)
+        for raw_pattern in patterns:
+            is_negated = raw_pattern.startswith("!")
+            pattern = raw_pattern[1:] if is_negated else raw_pattern
+            if not pattern:
+                continue
+            if self._matches_ignore_pattern(candidate, pattern):
+                ignored = not is_negated
+        return ignored
+
+    def _matches_ignore_pattern(self, candidate: Path, pattern: str) -> bool:
+        directory_only = pattern.endswith("/")
+        normalized = pattern[:-1] if directory_only else pattern
+        anchored = normalized.startswith("/")
+        if anchored:
+            normalized = normalized[1:]
+        if not normalized:
+            return False
+
+        candidate_posix = candidate.as_posix()
+        segments = candidate.parts
+        if "/" not in normalized:
+            if directory_only:
+                for index, segment in enumerate(segments):
+                    if fnmatch.fnmatch(segment, normalized):
+                        if index < len(segments) - 1 or candidate_posix == normalized:
+                            return True
+                return False
+            return any(fnmatch.fnmatch(segment, normalized) for segment in segments)
+
+        if anchored:
+            return self._matches_path_pattern(candidate_posix, normalized, directory_only)
+        return self._matches_path_pattern(candidate_posix, normalized, directory_only)
+
+    def _matches_path_pattern(
+        self,
+        candidate_posix: str,
+        pattern: str,
+        directory_only: bool,
+    ) -> bool:
+        if fnmatch.fnmatch(candidate_posix, pattern):
+            return True
+        if not directory_only:
+            return False
+        return candidate_posix == pattern or candidate_posix.startswith(f"{pattern}/")
+
+    def _filter_child_paths(self, paths: list[Path]) -> list[Path]:
+        allowed: list[Path] = []
+        for path in paths:
+            try:
+                resolved = path.resolve(strict=True)
+            except FileNotFoundError:
+                continue
+            if not resolved.is_relative_to(self._root_dir):
+                continue
+            if self._is_excluded_path(resolved):
+                continue
+            allowed.append(path)
+        return allowed
 
     def display_path(self, path: Path) -> str:
         if path == self._root_dir:
@@ -226,7 +343,7 @@ class FilesystemService:
             raise ValueError("Path is not a directory")
         entries: list[DirectoryEntry] = []
         for child in sorted(
-            resolved.iterdir(),
+            self._filter_child_paths(list(resolved.iterdir())),
             key=lambda item: (not item.is_dir(), item.name.lower()),
         ):
             info = child.stat()
@@ -263,16 +380,11 @@ class FilesystemService:
             if node.is_dir and (max_depth == 0 or current_depth < max_depth):
                 children: list[TreeNode] = []
                 for child in sorted(
-                    node_path.iterdir(),
+                    self._filter_child_paths(list(node_path.iterdir())),
                     key=lambda item: (not item.is_dir(), item.name.lower()),
                 ):
                     if child.is_symlink() and not follow_symlinks:
                         continue
-                    try:
-                        child_resolved = child.resolve(strict=True)
-                    except FileNotFoundError:
-                        continue
-                    self._assert_within_root(child_resolved)
                     children.append(build(child, current_depth + 1))
                 node.children.extend(children)
             return node
@@ -287,6 +399,16 @@ class FilesystemService:
         for current, dirnames, filenames in os.walk(resolved):
             current_path = Path(current)
             self._assert_within_root(current_path.resolve())
+            dirnames[:] = [
+                dirname
+                for dirname in sorted(dirnames)
+                if not self._is_excluded_path(current_path / dirname)
+            ]
+            filenames = [
+                filename
+                for filename in sorted(filenames)
+                if not self._is_excluded_path(current_path / filename)
+            ]
             names = [*dirnames, *filenames]
             for name in names:
                 if not fnmatch.fnmatch(name.lower(), pattern.lower()):
@@ -326,13 +448,35 @@ class FilesystemService:
                 if current_path == resolved
                 else len(current_path.relative_to(resolved).parts)
             )
-            dirnames.sort()
-            filenames.sort()
+            dirnames[:] = [
+                dirname
+                for dirname in sorted(dirnames)
+                if not self._is_excluded_path(current_path / dirname)
+            ]
+            filenames = [
+                filename
+                for filename in sorted(filenames)
+                if not self._is_excluded_path(current_path / filename)
+            ]
             if depth > 0 and rel_depth >= depth:
                 dirnames[:] = []
             for filename in filenames:
                 file_path = current_path / filename
                 self._assert_within_root(file_path.resolve())
+                display_path = self.display_path(file_path)
+                if substring in filename:
+                    matches.append(
+                        SearchWithinMatch(
+                            path=display_path,
+                            absolute_path=str(file_path),
+                            line_number=None,
+                            line_content=filename,
+                            match_type="filename",
+                        )
+                    )
+                    if len(matches) >= result_limit:
+                        limited = True
+                        return matches, limited
                 try:
                     info = file_path.stat()
                 except OSError:
@@ -349,10 +493,11 @@ class FilesystemService:
                         continue
                     matches.append(
                         SearchWithinMatch(
-                            path=self.display_path(file_path),
+                            path=display_path,
                             absolute_path=str(file_path),
                             line_number=index,
                             line_content=line,
+                            match_type="content",
                         )
                     )
                     if len(matches) >= result_limit:

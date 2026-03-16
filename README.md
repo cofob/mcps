@@ -216,6 +216,7 @@ Primary use cases:
 Safety properties:
 
 - all reads and writes are confined to `FILESYSTEM_ROOT_DIR`
+- paths matching `FILESYSTEM_IGNORE_PATTERNS` or any nested `.gitignore` file are excluded from every filesystem tool
 - symlink and path traversal escapes outside the configured root are rejected
 - `patch_file` is restricted to files under the configured root in the same way as every other write tool
 
@@ -530,6 +531,7 @@ Required:
 
 Optional:
 
+- `FILESYSTEM_IGNORE_PATTERNS`
 - `FILESYSTEM_MAX_INLINE_SIZE`
 - `FILESYSTEM_MAX_BASE64_SIZE`
 - `FILESYSTEM_MAX_SEARCH_RESULTS`
@@ -537,10 +539,16 @@ Optional:
 
 Default values:
 
+- `FILESYSTEM_IGNORE_PATTERNS=[]`
 - `FILESYSTEM_MAX_INLINE_SIZE=5242880`
 - `FILESYSTEM_MAX_BASE64_SIZE=1048576`
 - `FILESYSTEM_MAX_SEARCH_RESULTS=1000`
 - `FILESYSTEM_MAX_SEARCHABLE_SIZE=10485760`
+
+`FILESYSTEM_IGNORE_PATTERNS` accepts a JSON array of `.gitignore`-style patterns such as
+`[".git","node_modules/","*.log","secret/*.txt"]`. These rules are combined with `.gitignore`
+files found in the root directory and nested subdirectories. Matching files and directories are
+hidden from listings and searches and are rejected by direct read/write/modify/delete operations.
 
 ## Service Notes
 

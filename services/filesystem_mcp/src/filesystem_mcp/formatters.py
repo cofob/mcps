@@ -119,7 +119,11 @@ def format_search_within_files(
         if match.path != current_path:
             current_path = match.path
             lines.extend(["", f"File: {match.path}"])
-        lines.append(f"  Line {match.line_number}: {match.line_content}")
+        if match.match_type == "filename":
+            lines.append(f"  Filename match: {match.line_content}")
+            continue
+        line_number = match.line_number if match.line_number is not None else "?"
+        lines.append(f"  Line {line_number}: {match.line_content}")
     if limited:
         lines.extend(["", "Results were truncated at the configured max_results limit."])
     return "\n".join(lines)
