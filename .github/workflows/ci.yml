@@ -45,11 +45,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: ghcr.io/${{ github.repository }}/filesystem-mcp
+          - image: ghcr.io/cofob/filesystem-mcp
             dockerfile: docker/filesystem.Dockerfile
-          - image: ghcr.io/${{ github.repository }}/navidrome-mcp
+          - image: ghcr.io/cofob/navidrome-mcp
             dockerfile: docker/navidrome.Dockerfile
-          - image: ghcr.io/${{ github.repository }}/slskd-mcp
+          - image: ghcr.io/cofob/slskd-mcp
             dockerfile: docker/slskd.Dockerfile
     steps:
       - name: Checkout repository
