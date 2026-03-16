@@ -499,6 +499,84 @@ Notes:
 - `issuer_url`, `jwks_uri`, and `audience` are required for OAuth2 mode
 - because `oauth2` is a nested settings model, it is configured through the `OAUTH2` JSON value
 
+### Keycloak / OIDC guide
+
+This repository acts as a resource server for `/mcp`. It does not perform the OAuth login flow itself.
+The MCP client obtains a bearer token from Keycloak and sends it in `Authorization: Bearer ...`.
+
+Minimal-friction setup:
+
+1. Create or choose a Keycloak realm.
+2. Create one client to represent this MCP API, for example `mcps`.
+3. Configure this repository with that realm issuer, JWKS endpoint, and client ID as the expected audience.
+4. Make sure the tokens your MCP client sends include `aud: "mcps"`.
+
+Recommended environment variables:
+
+```bash
+export MCP_AUTH_MODE="oauth2"
+export OAUTH2='{
+  "strategy":"bearer",
+  "issuer_url":"https://keycloak.example.com/realms/myrealm",
+  "jwks_uri":"https://keycloak.example.com/realms/myrealm/protocol/openid-connect/certs",
+  "audience":"mcps"
+}'
+```
+
+Keycloak values:
+
+- `issuer_url`: realm issuer, usually `https://<host>/realms/<realm>`
+- `jwks_uri`: realm certs endpoint, usually `https://<host>/realms/<realm>/protocol/openid-connect/certs`
+- `audience`: the client ID you want this MCP server to accept, for example `mcps`
+
+Practical Keycloak setup:
+
+1. Create client `mcps`.
+2. If you want machine-to-machine access, enable `Client authentication` and `Service accounts roles`.
+3. If you want user login from another client, keep that caller client separate and add an Audience mapper so issued tokens include `mcps` in `aud`.
+
+Common failure mode:
+
+- the token is valid, but `/mcp` still rejects it because `aud` does not include the configured value
+
+If that happens, add an Audience mapper in Keycloak:
+
+1. Create a client scope such as `mcps-audience`.
+2. Add mapper type `Audience`.
+3. Set `Included Client Audience` to `mcps`.
+4. Attach that client scope to the client that is requesting tokens.
+
+Quick token check:
+
+```bash
+python - <<'PY'
+import base64
+import json
+
+token = "PASTE_ACCESS_TOKEN_HERE"
+payload = token.split(".")[1]
+payload += "=" * (-len(payload) % 4)
+print(json.dumps(json.loads(base64.urlsafe_b64decode(payload)), indent=2))
+PY
+```
+
+Confirm these claims match your MCP config:
+
+- `iss` equals `issuer_url`
+- `aud` contains `mcps` or your chosen audience value
+
+Client credentials example:
+
+```bash
+curl -s \
+  -d grant_type=client_credentials \
+  -d client_id=mcps \
+  -d client_secret="$KEYCLOAK_CLIENT_SECRET" \
+  "https://keycloak.example.com/realms/myrealm/protocol/openid-connect/token"
+```
+
+Use the returned `access_token` when calling `/mcp`.
+
 ### Navidrome configuration
 
 Required:
