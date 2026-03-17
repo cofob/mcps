@@ -119,10 +119,10 @@ def test_excluded_paths_are_rejected_for_direct_access(tmp_path: Path) -> None:
     (tmp_path / "secret" / "plan.txt").write_text("hidden\n", encoding="utf-8")
     (tmp_path / "events.log").write_text("hidden\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="Access denied for excluded path: secret/plan.txt"):
+    with pytest.raises(ValueError, match=r"Access denied for excluded path: secret/plan\.txt"):
         service.read_file("secret/plan.txt")
 
-    with pytest.raises(ValueError, match="Access denied for excluded path: events.log"):
+    with pytest.raises(ValueError, match=r"Access denied for excluded path: events\.log"):
         service.get_file_info("events.log")
 
 
@@ -169,7 +169,7 @@ def test_root_gitignore_excludes_paths_from_all_tools(tmp_path: Path) -> None:
     entries = service.list_directory(".")
     assert [entry.path for entry in entries] == [".gitignore", "visible.txt"]
 
-    with pytest.raises(ValueError, match="Access denied for excluded path: secret/notes.txt"):
+    with pytest.raises(ValueError, match=r"Access denied for excluded path: secret/notes\.txt"):
         service.read_file("secret/notes.txt")
 
     matches = service.search_files(".", "*.txt")
@@ -188,5 +188,5 @@ def test_nested_gitignore_applies_within_its_directory(tmp_path: Path) -> None:
     entries = service.list_directory("docs")
     assert [entry.path for entry in entries] == ["docs/.gitignore", "docs/public.txt"]
 
-    with pytest.raises(ValueError, match="Access denied for excluded path: docs/secret-plan.txt"):
+    with pytest.raises(ValueError, match=r"Access denied for excluded path: docs/secret-plan\.txt"):
         service.get_file_info("docs/secret-plan.txt")

@@ -9,6 +9,7 @@ from mcp_common.config import ToolSettings
 
 logger = logging.getLogger(__name__)
 
+
 class SupportsToolRegistration(Protocol):
     def tool(
         self,
@@ -41,7 +42,7 @@ def build_tool_tags(name: str, groups: frozenset[str]) -> frozenset[str]:
         tags.add("open-world")
     if "closed-world" in groups:
         tags.add("closed-world")
-    if name.startswith("navidrome_") or name.startswith("slskd_"):
+    if name.startswith(("navidrome_", "slskd_")):
         tags.add("remote-service")
         tags.add("open-world")
     elif name in {

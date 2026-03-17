@@ -165,9 +165,10 @@ class FilesystemService:
         if "/" not in normalized:
             if directory_only:
                 for index, segment in enumerate(segments):
-                    if fnmatch.fnmatch(segment, normalized):
-                        if index < len(segments) - 1 or candidate_posix == normalized:
-                            return True
+                    if fnmatch.fnmatch(segment, normalized) and (
+                        index < len(segments) - 1 or candidate_posix == normalized
+                    ):
+                        return True
                 return False
             return any(fnmatch.fnmatch(segment, normalized) for segment in segments)
 
@@ -399,17 +400,13 @@ class FilesystemService:
         for current, dirnames, filenames in os.walk(resolved):
             current_path = Path(current)
             self._assert_within_root(current_path.resolve())
-            dirnames[:] = [
-                dirname
-                for dirname in sorted(dirnames)
-                if not self._is_excluded_path(current_path / dirname)
-            ]
-            filenames = [
-                filename
-                for filename in sorted(filenames)
-                if not self._is_excluded_path(current_path / filename)
-            ]
-            names = [*dirnames, *filenames]
+            allowed_dirnames, allowed_filenames = self._filter_walk_entries(
+                current_path,
+                dirnames,
+                filenames,
+            )
+            dirnames[:] = allowed_dirnames
+            names = [*allowed_dirnames, *allowed_filenames]
             for name in names:
                 if not fnmatch.fnmatch(name.lower(), pattern.lower()):
                     continue
@@ -448,62 +445,94 @@ class FilesystemService:
                 if current_path == resolved
                 else len(current_path.relative_to(resolved).parts)
             )
-            dirnames[:] = [
-                dirname
-                for dirname in sorted(dirnames)
-                if not self._is_excluded_path(current_path / dirname)
-            ]
-            filenames = [
-                filename
-                for filename in sorted(filenames)
-                if not self._is_excluded_path(current_path / filename)
-            ]
+            allowed_dirnames, allowed_filenames = self._filter_walk_entries(
+                current_path,
+                dirnames,
+                filenames,
+            )
+            dirnames[:] = allowed_dirnames
             if depth > 0 and rel_depth >= depth:
                 dirnames[:] = []
-            for filename in filenames:
-                file_path = current_path / filename
-                self._assert_within_root(file_path.resolve())
-                display_path = self.display_path(file_path)
-                if substring in filename:
-                    matches.append(
-                        SearchWithinMatch(
-                            path=display_path,
-                            absolute_path=str(file_path),
-                            line_number=None,
-                            line_content=filename,
-                            match_type="filename",
-                        )
-                    )
-                    if len(matches) >= result_limit:
-                        limited = True
-                        return matches, limited
-                try:
-                    info = file_path.stat()
-                except OSError:
-                    continue
-                if info.st_size > self._settings.max_searchable_size:
-                    continue
-                data = file_path.read_bytes()
-                mime_type = self._detect_mime_type(file_path)
-                if not self._is_text_file(file_path, data, mime_type):
-                    continue
-                text = data.decode("utf-8")
-                for index, line in enumerate(text.splitlines(), start=1):
-                    if substring not in line:
-                        continue
-                    matches.append(
-                        SearchWithinMatch(
-                            path=display_path,
-                            absolute_path=str(file_path),
-                            line_number=index,
-                            line_content=line,
-                            match_type="content",
-                        )
-                    )
-                    if len(matches) >= result_limit:
-                        limited = True
-                        return matches, limited
+            for filename in allowed_filenames:
+                if self._collect_search_within_matches(
+                    current_path,
+                    filename,
+                    substring,
+                    matches,
+                    result_limit=result_limit,
+                ):
+                    limited = True
+                    return matches, limited
         return matches, limited
+
+    def _filter_walk_entries(
+        self,
+        current_path: Path,
+        dirnames: list[str],
+        filenames: list[str],
+    ) -> tuple[list[str], list[str]]:
+        allowed_dirnames = [
+            dirname
+            for dirname in sorted(dirnames)
+            if not self._is_excluded_path(current_path / dirname)
+        ]
+        allowed_filenames = [
+            filename
+            for filename in sorted(filenames)
+            if not self._is_excluded_path(current_path / filename)
+        ]
+        return allowed_dirnames, allowed_filenames
+
+    def _collect_search_within_matches(
+        self,
+        current_path: Path,
+        filename: str,
+        substring: str,
+        matches: list[SearchWithinMatch],
+        *,
+        result_limit: int,
+    ) -> bool:
+        file_path = current_path / filename
+        self._assert_within_root(file_path.resolve())
+        display_path = self.display_path(file_path)
+        if substring in filename:
+            matches.append(
+                SearchWithinMatch(
+                    path=display_path,
+                    absolute_path=str(file_path),
+                    line_number=None,
+                    line_content=filename,
+                    match_type="filename",
+                )
+            )
+            if len(matches) >= result_limit:
+                return True
+        try:
+            info = file_path.stat()
+        except OSError:
+            return False
+        if info.st_size > self._settings.max_searchable_size:
+            return False
+        data = file_path.read_bytes()
+        mime_type = self._detect_mime_type(file_path)
+        if not self._is_text_file(file_path, data, mime_type):
+            return False
+        text = data.decode("utf-8")
+        for index, line in enumerate(text.splitlines(), start=1):
+            if substring not in line:
+                continue
+            matches.append(
+                SearchWithinMatch(
+                    path=display_path,
+                    absolute_path=str(file_path),
+                    line_number=index,
+                    line_content=line,
+                    match_type="content",
+                )
+            )
+            if len(matches) >= result_limit:
+                return True
+        return False
 
     def get_file_info(self, path: str) -> FileMetadata:
         resolved = self.resolve_path(path)

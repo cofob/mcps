@@ -12,9 +12,9 @@ from mcp_common import (
     SupportsToolRegistration,
     ToolSpec,
     build_auth_provider,
+    build_http_app,
     build_tool_annotations,
     build_tool_tags,
-    build_http_app,
     register_enabled_tools,
 )
 from mcp_common.logging import configure_logging
