@@ -17,3 +17,16 @@ class ExportSearchMatch:
     absolute_path: str
     line_number: int
     line_text: str
+
+
+@dataclass(frozen=True)
+class ExportFileEntry:
+    path: str
+    absolute_path: str
+    size_bytes: int
+
+
+@dataclass(frozen=True)
+class ExportChatEntry:
+    chat_id: str
+    chat_name: str

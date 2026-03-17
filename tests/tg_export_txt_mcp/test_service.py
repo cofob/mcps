@@ -36,6 +36,61 @@ def test_read_export_file_rejects_non_txt_files(tmp_path: Path) -> None:
         service.read_export_file("chats.json")
 
 
+def test_list_export_files_lists_txt_files_under_directory(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    chat_dir = tmp_path / "chats" / "123"
+    chat_dir.mkdir(parents=True)
+    first_file = chat_dir / "2026-03-w3.txt"
+    second_file = chat_dir / "2026-03-w4.txt"
+    first_file.write_text("hello\n", encoding="utf-8")
+    second_file.write_text("world\n", encoding="utf-8")
+
+    files, limited = service.list_export_files("chats", max_results=10)
+
+    assert not limited
+    assert [file.path for file in files] == [
+        "chats/123/2026-03-w3.txt",
+        "chats/123/2026-03-w4.txt",
+    ]
+    assert files[0].size_bytes == len(b"hello\n")
+
+
+def test_list_export_files_applies_limit(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    chat_dir = tmp_path / "chats" / "123"
+    chat_dir.mkdir(parents=True)
+    for index in range(3):
+        (chat_dir / f"2026-03-w{index + 1}.txt").write_text("x\n", encoding="utf-8")
+
+    files, limited = service.list_export_files("chats", max_results=2)
+
+    assert limited
+    assert len(files) == 2
+
+
+def test_list_chats_reads_chat_mapping_file(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    (tmp_path / "chats.txt").write_text("123\tAlice\n456\tBob\n", encoding="utf-8")
+
+    chats, limited = service.list_chats(max_results=10)
+
+    assert not limited
+    assert [(chat.chat_id, chat.chat_name) for chat in chats] == [("123", "Alice"), ("456", "Bob")]
+
+
+def test_search_chats_filters_by_id_or_name(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    (tmp_path / "chats.txt").write_text("123\tAlice Example\n456\tBob\n", encoding="utf-8")
+
+    by_name, limited_by_name = service.search_chats("alice", max_results=10)
+    by_id, limited_by_id = service.search_chats("456", max_results=10)
+
+    assert not limited_by_name
+    assert not limited_by_id
+    assert [(chat.chat_id, chat.chat_name) for chat in by_name] == [("123", "Alice Example")]
+    assert [(chat.chat_id, chat.chat_name) for chat in by_id] == [("456", "Bob")]
+
+
 def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     export_file = tmp_path / "chats" / "123" / "2026-03-w3.txt"

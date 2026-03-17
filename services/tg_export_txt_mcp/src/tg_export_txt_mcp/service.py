@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from tg_export_txt_mcp.config import TgExportTxtSettings
-from tg_export_txt_mcp.models import ExportReadResult, ExportSearchMatch
+from tg_export_txt_mcp.models import ExportChatEntry, ExportFileEntry, ExportReadResult, ExportSearchMatch
 
 
 class TgExportTxtService:
@@ -59,6 +59,56 @@ class TgExportTxtService:
             total_lines=len(lines),
             content=content,
         )
+
+    def list_export_files(
+        self,
+        path: str = ".",
+        *,
+        max_results: int | None = None,
+    ) -> tuple[list[ExportFileEntry], bool]:
+        resolved = self.resolve_path(path)
+        effective_max_results = max_results or self._settings.max_search_results
+        if effective_max_results <= 0:
+            raise ValueError("max_results must be greater than 0.")
+
+        entries: list[ExportFileEntry] = []
+        if resolved.is_file():
+            if resolved.suffix != ".txt":
+                raise ValueError("Only .txt export files can be listed.")
+            entries.append(self._build_file_entry(resolved))
+            return entries, False
+
+        candidates = sorted(candidate for candidate in resolved.rglob("*.txt") if candidate.is_file())
+        limited = len(candidates) > effective_max_results
+        entries.extend(self._build_file_entry(candidate) for candidate in candidates[:effective_max_results])
+        return entries, limited
+
+    def list_chats(self, *, max_results: int | None = None) -> tuple[list[ExportChatEntry], bool]:
+        chats = self._load_chat_entries()
+        effective_max_results = max_results or self._settings.max_search_results
+        if effective_max_results <= 0:
+            raise ValueError("max_results must be greater than 0.")
+        limited = len(chats) > effective_max_results
+        return chats[:effective_max_results], limited
+
+    def search_chats(self, query: str, *, max_results: int | None = None) -> tuple[list[ExportChatEntry], bool]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            raise ValueError("query must not be empty.")
+
+        chats = self._load_chat_entries()
+        effective_max_results = max_results or self._settings.max_search_results
+        if effective_max_results <= 0:
+            raise ValueError("max_results must be greater than 0.")
+
+        lowered_query = normalized_query.casefold()
+        matches = [
+            chat
+            for chat in chats
+            if lowered_query in chat.chat_id.casefold() or lowered_query in chat.chat_name.casefold()
+        ]
+        limited = len(matches) > effective_max_results
+        return matches[:effective_max_results], limited
 
     def search_exports(
         self,
@@ -129,6 +179,28 @@ class TgExportTxtService:
             raise ValueError(message)
 
         return matches, limited
+
+    def _build_file_entry(self, path: Path) -> ExportFileEntry:
+        return ExportFileEntry(
+            path=self.display_path(path),
+            absolute_path=str(path),
+            size_bytes=path.stat().st_size,
+        )
+
+    def _load_chat_entries(self) -> list[ExportChatEntry]:
+        chats_path = self._root_dir / "chats.txt"
+        if not chats_path.exists():
+            raise ValueError(f"Chat mapping file does not exist: {chats_path}")
+
+        chats: list[ExportChatEntry] = []
+        for line in chats_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            chat_id, separator, chat_name = line.partition("\t")
+            if not separator:
+                continue
+            chats.append(ExportChatEntry(chat_id=chat_id, chat_name=chat_name))
+        return chats
 
     def _iter_rg_output(self, stdout: Iterator[str]) -> Iterator[str]:
         yield from stdout
