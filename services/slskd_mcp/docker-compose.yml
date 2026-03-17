@@ -1,0 +1,10 @@
+services:
+  slskd-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/slskd.Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SLSKD_URL: "https://slskd.example.com"
+      SLSKD_API_KEY: "your-api-key"

@@ -1,0 +1,18 @@
+[project]
+name = "mcp-common"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28.1",
+  "pydantic>=2.11.0",
+  "pydantic-settings>=2.8.0",
+  "starlette>=0.46.0",
+  "typing-extensions>=4.12.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_common"]
