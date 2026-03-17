@@ -8,6 +8,8 @@ from mcp_common import (
     SupportsToolRegistration,
     ToolSpec,
     build_auth_provider,
+    build_tool_annotations,
+    build_tool_tags,
     build_http_app,
     create_async_client,
     register_enabled_tools,
@@ -20,12 +22,18 @@ from navidrome_mcp.tools import GetTools, ListTools, MutationTools, PlaylistTool
 
 
 def _tool_spec(method: Callable[..., Awaitable[str]], name: str, *groups: str) -> ToolSpec:
+    group_set = frozenset(groups)
+    tags = build_tool_tags(name, group_set)
+    annotations = build_tool_annotations(name, group_set)
+
     def register_tool(mcp: SupportsToolRegistration) -> None:
-        mcp.tool(method, name=name)
+        mcp.tool(method, name=name, tags=set(tags), annotations=annotations)
 
     return ToolSpec(
         name=name,
-        groups=frozenset(groups),
+        groups=group_set,
+        tags=tags,
+        annotations=annotations,
         register=register_tool,
     )
 

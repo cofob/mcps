@@ -12,6 +12,8 @@ from mcp_common import (
     SupportsToolRegistration,
     ToolSpec,
     build_auth_provider,
+    build_tool_annotations,
+    build_tool_tags,
     build_http_app,
     register_enabled_tools,
 )
@@ -19,12 +21,18 @@ from mcp_common.logging import configure_logging
 
 
 def _tool_spec(method: Callable[..., Awaitable[str]], name: str, *groups: str) -> ToolSpec:
+    group_set = frozenset(groups)
+    tags = build_tool_tags(name, group_set)
+    annotations = build_tool_annotations(name, group_set)
+
     def register_tool(mcp: SupportsToolRegistration) -> None:
-        mcp.tool(method, name=name)
+        mcp.tool(method, name=name, tags=set(tags), annotations=annotations)
 
     return ToolSpec(
         name=name,
-        groups=frozenset(groups),
+        groups=group_set,
+        tags=tags,
+        annotations=annotations,
         register=register_tool,
     )
 
@@ -33,7 +41,10 @@ def _register_file_resource(mcp: FastMCP, service: FilesystemService) -> None:
     @mcp.resource(
         "file://{path*}",
         name="file://",
-        description="Read a file from the configured filesystem root.",
+        description=(
+            "Read a file from the configured filesystem root. "
+            "[markers: closed-world, local-filesystem, read-only]"
+        ),
     )
     def file_resource(path: str) -> str | bytes:
         return service.resource_content(path)

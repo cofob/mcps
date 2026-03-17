@@ -26,6 +26,8 @@ from mcp_common.mcp_http import build_http_app
 from mcp_common.tool_registry import (
     SupportsToolRegistration,
     ToolSpec,
+    build_tool_annotations,
+    build_tool_tags,
     register_enabled_tools,
     should_enable_tool,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "SupportsToolRegistration",
     "ToolSettings",
     "ToolSpec",
+    "build_tool_annotations",
+    "build_tool_tags",
     "UpstreamAuthError",
     "UpstreamNotFoundError",
     "UpstreamRateLimitError",

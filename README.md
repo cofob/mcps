@@ -238,6 +238,13 @@ Exposed tools:
 - `modify_file`
 - `patch_file`
 
+Tool markers:
+
+- all tools expose MCP tags and annotations describing their behavior
+- common markers include `read-only`, `write`, `destructive`, `open-world`, and `closed-world`
+- remote tools in Navidrome and slskd are marked as `open-world`
+- local filesystem tools are marked as `closed-world`
+
 Tool inputs and outputs:
 
 - `read_file(path: str) -> str`
