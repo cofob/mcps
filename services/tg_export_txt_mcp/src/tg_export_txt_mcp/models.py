@@ -30,3 +30,9 @@ class ExportFileEntry:
 class ExportChatEntry:
     chat_id: str
     chat_name: str
+
+
+@dataclass(frozen=True)
+class ExportTopicEntry:
+    topic_id: str
+    topic_name: str

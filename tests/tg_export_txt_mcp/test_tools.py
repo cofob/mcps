@@ -4,9 +4,15 @@ from unittest.mock import patch
 import pytest
 
 from tg_export_txt_mcp.config import TgExportTxtSettings
-from tg_export_txt_mcp.models import ExportChatEntry, ExportFileEntry, ExportReadResult, ExportSearchMatch
+from tg_export_txt_mcp.models import (
+    ExportChatEntry,
+    ExportFileEntry,
+    ExportReadResult,
+    ExportSearchMatch,
+    ExportTopicEntry,
+)
 from tg_export_txt_mcp.service import TgExportTxtService
-from tg_export_txt_mcp.tools import ChatTools, FileTools, ReadTools, SearchTools
+from tg_export_txt_mcp.tools import ChatTools, FileTools, ReadTools, SearchTools, TopicTools
 
 
 def make_service(tmp_path: Path) -> TgExportTxtService:
@@ -90,3 +96,15 @@ async def test_chat_tools_format_chat_results(tmp_path: Path) -> None:
     assert "123\tAlice" in list_text
     assert 'Search chats for "alice": 1 match(es)' in search_text
     assert "123\tAlice" in search_text
+
+
+@pytest.mark.asyncio
+async def test_topic_tools_format_topic_results(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    topics = [ExportTopicEntry(topic_id="42", topic_name="Release notes")]
+
+    with patch.object(service, "list_topics", return_value=(topics, False)):
+        text = await TopicTools(service).list_topics("123")
+
+    assert "Topics for chat 123: 1 topic(s)" in text
+    assert "42\tRelease notes" in text

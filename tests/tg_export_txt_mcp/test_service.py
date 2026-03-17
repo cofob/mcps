@@ -91,6 +91,18 @@ def test_search_chats_filters_by_id_or_name(tmp_path: Path) -> None:
     assert [(chat.chat_id, chat.chat_name) for chat in by_id] == [("456", "Bob")]
 
 
+def test_list_topics_reads_per_chat_topic_mapping_file(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    topic_dir = tmp_path / "chats" / "123"
+    topic_dir.mkdir(parents=True)
+    (topic_dir / "topics.txt").write_text("1\tGeneral\n42\tRelease notes\n", encoding="utf-8")
+
+    topics, limited = service.list_topics("123", max_results=10)
+
+    assert not limited
+    assert [(topic.topic_id, topic.topic_name) for topic in topics] == [("1", "General"), ("42", "Release notes")]
+
+
 def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     export_file = tmp_path / "chats" / "123" / "2026-03-w3.txt"

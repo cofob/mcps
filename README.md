@@ -72,6 +72,7 @@ Highlights:
 - `list_export_files` lists transcript files under one path
 - `list_chats` reads exported chat mappings from `chats.txt`
 - `search_chats` searches exported chat ids and names
+- `list_topics` reads exported topic mappings from `chats/<chat_id>/topics.txt`
 - `read_export_file` reads transcript files by relative path
 - `search_exports` searches transcript files with `rg`
 - access is restricted to one configured export root

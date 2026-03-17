@@ -7,6 +7,7 @@ It exposes:
 - `list_export_files`: list `.txt` transcript files under one path
 - `list_chats`: read chat ids and names from `chats.txt`
 - `search_chats`: search chat ids and names from `chats.txt`
+- `list_topics`: list forum topics from `chats/<chat_id>/topics.txt`
 - `read_export_file`: read one transcript file under the configured export root
 - `search_exports`: search transcript files with `rg`
 

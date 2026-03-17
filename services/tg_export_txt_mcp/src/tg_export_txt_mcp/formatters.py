@@ -1,6 +1,12 @@
 from collections.abc import Sequence
 
-from tg_export_txt_mcp.models import ExportChatEntry, ExportFileEntry, ExportReadResult, ExportSearchMatch
+from tg_export_txt_mcp.models import (
+    ExportChatEntry,
+    ExportFileEntry,
+    ExportReadResult,
+    ExportSearchMatch,
+    ExportTopicEntry,
+)
 
 
 def format_read_result(result: ExportReadResult) -> str:
@@ -52,6 +58,15 @@ def format_chat_search_results(query: str, chats: Sequence[ExportChatEntry], *, 
     lines = [f'Search chats for "{query}": {len(chats)} match(es)']
     for index, chat in enumerate(chats, start=1):
         lines.append(f"{index}. {chat.chat_id}\t{chat.chat_name}")
+    if limited:
+        lines.extend(["", "Results were truncated at the configured max_search_results limit."])
+    return "\n".join(lines)
+
+
+def format_topic_list(chat_id: str, topics: Sequence[ExportTopicEntry], *, limited: bool) -> str:
+    lines = [f"Topics for chat {chat_id}: {len(topics)} topic(s)"]
+    for index, topic in enumerate(topics, start=1):
+        lines.append(f"{index}. {topic.topic_id}\t{topic.topic_name}")
     if limited:
         lines.extend(["", "Results were truncated at the configured max_search_results limit."])
     return "\n".join(lines)

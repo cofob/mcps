@@ -4,7 +4,13 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from tg_export_txt_mcp.config import TgExportTxtSettings
-from tg_export_txt_mcp.models import ExportChatEntry, ExportFileEntry, ExportReadResult, ExportSearchMatch
+from tg_export_txt_mcp.models import (
+    ExportChatEntry,
+    ExportFileEntry,
+    ExportReadResult,
+    ExportSearchMatch,
+    ExportTopicEntry,
+)
 
 
 class TgExportTxtService:
@@ -110,6 +116,19 @@ class TgExportTxtService:
         limited = len(matches) > effective_max_results
         return matches[:effective_max_results], limited
 
+    def list_topics(self, chat_id: str, *, max_results: int | None = None) -> tuple[list[ExportTopicEntry], bool]:
+        normalized_chat_id = chat_id.strip()
+        if not normalized_chat_id:
+            raise ValueError("chat_id must not be empty.")
+
+        topics_path = self.resolve_path(str(Path("chats") / normalized_chat_id / "topics.txt"))
+        topics = self._load_topic_entries(topics_path)
+        effective_max_results = max_results or self._settings.max_search_results
+        if effective_max_results <= 0:
+            raise ValueError("max_results must be greater than 0.")
+        limited = len(topics) > effective_max_results
+        return topics[:effective_max_results], limited
+
     def search_exports(
         self,
         path: str,
@@ -201,6 +220,20 @@ class TgExportTxtService:
                 continue
             chats.append(ExportChatEntry(chat_id=chat_id, chat_name=chat_name))
         return chats
+
+    def _load_topic_entries(self, topics_path: Path) -> list[ExportTopicEntry]:
+        if not topics_path.exists():
+            raise ValueError(f"Topic mapping file does not exist: {topics_path}")
+
+        topics: list[ExportTopicEntry] = []
+        for line in topics_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            topic_id, separator, topic_name = line.partition("\t")
+            if not separator:
+                continue
+            topics.append(ExportTopicEntry(topic_id=topic_id, topic_name=topic_name))
+        return topics
 
     def _iter_rg_output(self, stdout: Iterator[str]) -> Iterator[str]:
         yield from stdout
