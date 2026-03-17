@@ -21,6 +21,7 @@ class FakeSlskdClient:
         self.timeout_seconds = 20.0
         self.search_poll_interval_seconds = 0.0
         self.search_status_calls = 0
+        self.search_response_calls = 0
 
     async def request(
         self,
@@ -35,10 +36,11 @@ class FakeSlskdClient:
             return {"id": "search-1", "isComplete": False}
         if path == "/api/v0/searches/search-1":
             self.search_status_calls += 1
-            if self.search_status_calls == 1:
-                return {"id": "search-1", "isComplete": False}
             return {"id": "search-1", "isComplete": True}
         if path.endswith("/responses"):
+            self.search_response_calls += 1
+            if self.search_response_calls == 1:
+                return []
             return [
                 {
                     "username": "alice",
@@ -56,7 +58,7 @@ async def test_create_search_waits_for_results_and_formats_output() -> None:
     assert "Music/song.flac" in text
     assert client.calls[0][0] == "POST"
     assert client.calls[0][1] == "/api/v0/searches"
-    assert client.calls[1][1] == "/api/v0/searches/search-1"
+    assert client.calls[1][1] == "/api/v0/searches/search-1/responses"
     assert client.calls[2][1] == "/api/v0/searches/search-1"
     assert client.calls[3][1] == "/api/v0/searches/search-1/responses"
 

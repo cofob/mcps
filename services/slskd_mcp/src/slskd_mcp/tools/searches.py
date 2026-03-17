@@ -45,22 +45,7 @@ class SearchTools:
         )
         search = expect_object(payload, context="create_search")
         search_id_value = get_str(search, "id") or get_str(search, "Id") or "unknown"
-        completed = await self._wait_for_search_completion(search_id_value, search, search_timeout)
-        has_inline_responses = "responses" in completed or "Responses" in completed
-        inline_responses = get_object_list(completed, "responses", context="create_search") or (
-            get_object_list(completed, "Responses", context="create_search")
-        )
-        if has_inline_responses:
-            return format_search_results(
-                search_id_value,
-                normalize_search_results(inline_responses),
-                limit=limit,
-            )
-        payload = await self._client.request("GET", f"/api/v0/searches/{search_id_value}/responses")
-        response_items = [
-            expect_object(item, context="create_search")
-            for item in expect_array(payload, context="create_search")
-        ]
+        response_items = await self._wait_for_search_results(search_id_value, search, search_timeout)
         results = normalize_search_results(response_items)
         return format_search_results(search_id_value, results, limit=limit)
 
@@ -109,21 +94,51 @@ class SearchTools:
         await self._client.request("DELETE", f"/api/v0/searches/{search_id}")
         return format_simple_summary(f"Deleted search {search_id}.")
 
-    async def _wait_for_search_completion(
+    async def _wait_for_search_results(
         self,
         search_id: str,
         initial_search: JsonObject,
         search_timeout: int,
-    ) -> JsonObject:
+    ) -> list[JsonObject]:
         search = initial_search
-        deadline = monotonic() + max(float(search_timeout), self._client.timeout_seconds)
-        while not _is_search_complete(search):
+        deadline = monotonic() + max(float(search_timeout) + 5.0, self._client.timeout_seconds)
+        latest_results = _extract_inline_responses(search)
+        completed_empty_polls = 0
+
+        while True:
+            if latest_results and _is_search_complete(search):
+                return latest_results
             if monotonic() >= deadline:
-                raise TimeoutError(f"Timed out waiting for slskd search {search_id} to complete.")
+                return latest_results
+
+            response_payload = await self._client.request("GET", f"/api/v0/searches/{search_id}/responses")
+            response_items = [
+                expect_object(item, context="create_search")
+                for item in expect_array(response_payload, context="create_search")
+            ]
+            if response_items:
+                latest_results = response_items
+
+            if _is_search_complete(search):
+                if latest_results:
+                    return latest_results
+                completed_empty_polls += 1
+                if completed_empty_polls >= 3:
+                    return []
+            else:
+                completed_empty_polls = 0
+
             await asyncio.sleep(self._client.search_poll_interval_seconds)
             payload = await self._client.request("GET", f"/api/v0/searches/{search_id}")
             search = expect_object(payload, context="create_search")
-        return search
+
+
+def _extract_inline_responses(search: JsonObject) -> list[JsonObject]:
+    if "responses" in search:
+        return get_object_list(search, "responses", context="create_search")
+    if "Responses" in search:
+        return get_object_list(search, "Responses", context="create_search")
+    return []
 
 
 def _is_search_complete(search: JsonObject) -> bool:
