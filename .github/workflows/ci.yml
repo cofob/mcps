@@ -51,6 +51,8 @@ jobs:
             dockerfile: docker/navidrome.Dockerfile
           - image: ghcr.io/cofob/slskd-mcp
             dockerfile: docker/slskd.Dockerfile
+          - image: ghcr.io/cofob/tg-export-txt-mcp
+            dockerfile: docker/tg-export-txt.Dockerfile
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

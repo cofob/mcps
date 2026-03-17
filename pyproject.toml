@@ -10,6 +10,7 @@ members = [
   "services/filesystem_mcp",
   "services/navidrome_mcp",
   "services/slskd_mcp",
+  "services/tg_export_txt_mcp",
 ]
 
 [tool.uv.sources]
@@ -102,6 +103,7 @@ known-first-party = [
   "mcp_common",
   "navidrome_mcp",
   "slskd_mcp",
+  "tg_export_txt_mcp",
 ]
 
 [tool.ruff.lint.per-file-ignores]

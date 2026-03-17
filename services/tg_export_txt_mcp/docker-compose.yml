@@ -1,0 +1,11 @@
+services:
+  tg-export-txt-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/tg-export-txt.Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      TG_EXPORT_TXT_ROOT_DIR: "/workspace"
+    volumes:
+      - ../../local/tg_backup_txt:/workspace
