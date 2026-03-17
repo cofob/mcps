@@ -12,6 +12,14 @@ class SlskdClient:
         self._http = http_client
         self._auth = SlskdAuth(settings, http_client)
 
+    @property
+    def timeout_seconds(self) -> float:
+        return self._settings.timeout_seconds
+
+    @property
+    def search_poll_interval_seconds(self) -> float:
+        return self._settings.slskd_search_poll_interval_seconds
+
     async def request(
         self,
         method: str,

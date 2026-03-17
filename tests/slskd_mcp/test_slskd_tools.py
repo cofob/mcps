@@ -18,6 +18,9 @@ class FakeSlskdClient:
                 JsonValue | None,
             ]
         ] = []
+        self.timeout_seconds = 20.0
+        self.search_poll_interval_seconds = 0.0
+        self.search_status_calls = 0
 
     async def request(
         self,
@@ -29,7 +32,12 @@ class FakeSlskdClient:
     ) -> JsonObject | JsonArray:
         self.calls.append((method, path, params, json_body))
         if path == "/api/v0/searches":
-            return {"id": "search-1"}
+            return {"id": "search-1", "isComplete": False}
+        if path == "/api/v0/searches/search-1":
+            self.search_status_calls += 1
+            if self.search_status_calls == 1:
+                return {"id": "search-1", "isComplete": False}
+            return {"id": "search-1", "isComplete": True}
         if path.endswith("/responses"):
             return [
                 {
@@ -41,12 +49,16 @@ class FakeSlskdClient:
 
 
 @pytest.mark.asyncio
-async def test_create_search_sends_expected_payload() -> None:
+async def test_create_search_waits_for_results_and_formats_output() -> None:
     client = FakeSlskdClient()
     text = await SearchTools(cast(SlskdClient, client)).create_search("beatles")
-    assert text == "Started search search-1."
+    assert "Search search-1 returned 1 matching files." in text
+    assert "Music/song.flac" in text
     assert client.calls[0][0] == "POST"
     assert client.calls[0][1] == "/api/v0/searches"
+    assert client.calls[1][1] == "/api/v0/searches/search-1"
+    assert client.calls[2][1] == "/api/v0/searches/search-1"
+    assert client.calls[3][1] == "/api/v0/searches/search-1/responses"
 
 
 @pytest.mark.asyncio

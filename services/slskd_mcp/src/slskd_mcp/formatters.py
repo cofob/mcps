@@ -5,10 +5,6 @@ from mcp_common.formatters import truncation_suffix
 from slskd_mcp.models import SlskdSearchFile
 
 
-def format_search_created(search_id: str) -> str:
-    return f"Started search {search_id}."
-
-
 def format_search_list(searches: Sequence[JsonObject]) -> str:
     lines = [f"Found {len(searches)} searches."]
     for index, search in enumerate(searches, start=1):

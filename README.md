@@ -118,8 +118,8 @@ MCP server for [slskd](https://github.com/slskd/slskd) using the slskd REST API.
 
 Primary use cases:
 
-- create and inspect searches
-- view readable search results
+- create searches and wait for readable final results
+- inspect existing searches when needed
 - inspect users and browse user shares
 - request downloads
 - inspect downloads, queue positions, uploads, and files
@@ -149,9 +149,9 @@ Exposed tools:
 
 Tool inputs and outputs:
 
-- `slskd_create_search(search_text: str, response_limit: int = 100, file_limit: int = 10000, search_timeout: int = 15, filter_responses: bool = True, minimum_response_file_count: int = 1, maximum_peer_queue_length: int = 1000000, minimum_peer_upload_speed: int = 0) -> str`
+- `slskd_create_search(search_text: str, response_limit: int = 100, file_limit: int = 10000, search_timeout: int = 15, filter_responses: bool = True, minimum_response_file_count: int = 1, maximum_peer_queue_length: int = 1000000, minimum_peer_upload_speed: int = 0, limit: int = 50) -> str`
   Input: search text and slskd search tuning parameters.
-  Output: short confirmation with the created search id.
+  Output: waits for search completion and returns a readable flattened file result list.
 - `slskd_list_searches() -> str`
   Input: none.
   Output: readable list of tracked searches with ids and search text.
@@ -607,6 +607,10 @@ Required:
 - one of:
   - `SLSKD_API_KEY`
   - `SLSKD_USERNAME` and `SLSKD_PASSWORD`
+
+Optional:
+
+- `SLSKD_SEARCH_POLL_INTERVAL_SECONDS`
 
 ### Filesystem configuration
 

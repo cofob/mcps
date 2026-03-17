@@ -10,6 +10,10 @@ class SlskdSettings(BaseServiceSettings):
     slskd_api_key: str | None = Field(default=None, alias="SLSKD_API_KEY")
     slskd_username: str | None = Field(default=None, alias="SLSKD_USERNAME")
     slskd_password: str | None = Field(default=None, alias="SLSKD_PASSWORD")
+    slskd_search_poll_interval_seconds: float = Field(
+        default=0.5,
+        alias="SLSKD_SEARCH_POLL_INTERVAL_SECONDS",
+    )
     tools: ToolSettings = Field(default_factory=ToolSettings)
 
     @model_validator(mode="after")
