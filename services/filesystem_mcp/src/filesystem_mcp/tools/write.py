@@ -51,7 +51,18 @@ class WriteTools:
         )
 
     async def patch_file(self, path: str, patch: str) -> str:
-        """Apply a unified diff patch to one file."""
+        """Apply a unified diff patch to one file.
+
+        Use the standard diff format with file headers and hunk context, for example:
+
+        ```diff
+        --- test.md
+        +++ test.md
+        @@ -2 +2 @@
+        -Line 2
+        +Line 2 updated
+        ```
+        """
         resolved, changed_lines = self._service.patch_file(path, patch)
         return format_summary(
             f"Applied patch to {self._service.display_path(resolved)}. "

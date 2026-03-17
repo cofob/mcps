@@ -295,6 +295,16 @@ Tool inputs and outputs:
   Output: short summary with replacement count.
 - `patch_file(path: str, patch: str) -> str`
   Input: target path and unified diff patch text.
+
+  Example patch format:
+
+  ```diff
+  --- test.md
+  +++ test.md
+  @@ -2 +2 @@
+  -Line 2
+  +Line 2 updated
+  ```
   Output: short summary with changed line count.
 
 ## Development
