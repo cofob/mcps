@@ -1,5 +1,5 @@
 from mcp_common import JsonObject, get_bool, get_int, get_str
-from navidrome_mcp.models import CatalogItem, PlaylistItem
+from navidrome_mcp.models import CatalogItem, PlaylistItem, ShareLinkItem
 
 
 def normalize_artist(payload: JsonObject) -> CatalogItem:
@@ -50,4 +50,17 @@ def normalize_playlist(payload: JsonObject) -> PlaylistItem:
         song_count=get_int(payload, "songCount"),
         public=get_bool(payload, "public"),
         owner=get_str(payload, "owner"),
+    )
+
+
+def normalize_share_link(payload: JsonObject) -> ShareLinkItem:
+    share_id = get_str(payload, "id")
+    url = get_str(payload, "url")
+    if share_id is None or url is None:
+        raise ValueError("Share payload is missing id or url.")
+    return ShareLinkItem(
+        id=share_id,
+        url=url,
+        description=get_str(payload, "description"),
+        expires=get_str(payload, "expires"),
     )

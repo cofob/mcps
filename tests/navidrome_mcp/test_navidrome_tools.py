@@ -35,6 +35,16 @@ class FakeNavidromeClient:
                     "playlist": {"id": "pl-1", "name": "Road Trip"}
                 }
             }
+        if endpoint == "createShare":
+            return {
+                "subsonic-response": {
+                    "share": {
+                        "id": "sh-1",
+                        "url": "https://navidrome.example.com/share/sh-1",
+                        "description": "Road Trip mix",
+                    }
+                }
+            }
         return {"subsonic-response": {}}
 
 
@@ -68,3 +78,17 @@ async def test_rate_rejects_out_of_range_value() -> None:
             "track-1",
             6,
         )
+
+
+@pytest.mark.asyncio
+async def test_get_public_share_link_returns_share_url() -> None:
+    client = FakeNavidromeClient()
+    text = await PlaylistTools(cast(NavidromeClient, client)).get_public_share_link(
+        ["pl-1"],
+        description="Road Trip mix",
+    )
+    assert "Public share link" in text
+    assert "- url: https://navidrome.example.com/share/sh-1" in text
+    assert client.calls == [
+        ("createShare", {"id": ["pl-1"], "description": "Road Trip mix"})
+    ]

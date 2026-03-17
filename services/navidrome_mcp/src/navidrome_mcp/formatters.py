@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from mcp_common.formatters import truncation_suffix
-from navidrome_mcp.models import CatalogItem, PlaylistItem
+from navidrome_mcp.models import CatalogItem, PlaylistItem, ShareLinkItem
 
 
 def _format_catalog_items(title: str, items: Sequence[CatalogItem], *, limit: int) -> str:
@@ -65,6 +65,15 @@ def format_playlist_list(playlists: Sequence[PlaylistItem]) -> str:
     for index, playlist in enumerate(playlists, start=1):
         lines.append(f"{index}. {playlist.name}")
         lines.append(f"   id: {playlist.id}")
+    return "\n".join(lines)
+
+
+def format_share_link(item: ShareLinkItem) -> str:
+    lines = ["Public share link", f"- id: {item.id}", f"- url: {item.url}"]
+    if item.description:
+        lines.append(f"- description: {item.description}")
+    if item.expires:
+        lines.append(f"- expires: {item.expires}")
     return "\n".join(lines)
 
 

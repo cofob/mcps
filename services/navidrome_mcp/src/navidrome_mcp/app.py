@@ -95,6 +95,12 @@ def _make_tool_specs(client: NavidromeClient) -> list[ToolSpec]:
             "mutate",
             "playlist",
         ),
+        _tool_spec(
+            playlist_tools.get_public_share_link,
+            "navidrome_get_public_share_link",
+            "mutate",
+            "share",
+        ),
     ]
 
 

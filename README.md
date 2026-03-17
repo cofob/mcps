@@ -57,6 +57,7 @@ Exposed tools:
 - `navidrome_create_playlist`
 - `navidrome_update_playlist`
 - `navidrome_delete_playlist`
+- `navidrome_get_public_share_link`
 
 Tool inputs and outputs:
 
@@ -111,6 +112,9 @@ Tool inputs and outputs:
 - `navidrome_delete_playlist(playlist_id: str) -> str`
   Input: playlist id.
   Output: short deletion confirmation string.
+- `navidrome_get_public_share_link(item_ids: list[str], description: str | None = None, expires: str | None = None) -> str`
+  Input: one or more Navidrome item ids plus optional description and expiration timestamp string.
+  Output: readable public share url summary.
 
 ### `slskd-mcp`
 

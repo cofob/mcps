@@ -21,3 +21,10 @@ class PlaylistItem(BaseModel):
     song_count: int | None = None
     public: bool | None = None
     owner: str | None = None
+
+
+class ShareLinkItem(BaseModel):
+    id: str
+    url: str
+    description: str | None = None
+    expires: str | None = None
