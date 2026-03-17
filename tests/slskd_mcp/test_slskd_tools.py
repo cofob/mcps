@@ -58,6 +58,16 @@ async def test_create_search_waits_for_results_and_formats_output() -> None:
     assert "Music/song.flac" in text
     assert client.calls[0][0] == "POST"
     assert client.calls[0][1] == "/api/v0/searches"
+    assert client.calls[0][3] == {
+        "searchText": "beatles",
+        "responseLimit": 100,
+        "fileLimit": 10000,
+        "searchTimeout": 15000,
+        "filterResponses": True,
+        "minimumResponseFileCount": 1,
+        "maximumPeerQueueLength": 1000000,
+        "minimumPeerUploadSpeed": 0,
+    }
     assert client.calls[1][1] == "/api/v0/searches/search-1/responses"
     assert client.calls[2][1] == "/api/v0/searches/search-1"
     assert client.calls[3][1] == "/api/v0/searches/search-1/responses"

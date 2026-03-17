@@ -36,7 +36,7 @@ class SearchTools:
                 "searchText": search_text,
                 "responseLimit": response_limit,
                 "fileLimit": file_limit,
-                "searchTimeout": search_timeout,
+                "searchTimeout": search_timeout * 1000,
                 "filterResponses": filter_responses,
                 "minimumResponseFileCount": minimum_response_file_count,
                 "maximumPeerQueueLength": maximum_peer_queue_length,
