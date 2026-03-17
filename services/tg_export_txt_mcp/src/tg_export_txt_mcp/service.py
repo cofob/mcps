@@ -140,6 +140,9 @@ class TgExportTxtService:
         effective_max_results = max_results or self._settings.max_search_results
         if effective_max_results <= 0:
             raise ValueError("max_results must be greater than 0.")
+        search_paths = self._resolve_search_paths(resolved)
+        if not search_paths:
+            return [], False
 
         command = [
             self._rg_path,
@@ -149,10 +152,8 @@ class TgExportTxtService:
             str(effective_max_results),
             "--color=never",
             "--smart-case",
-            "--glob",
-            "*.txt",
             query,
-            str(resolved),
+            *(str(search_path) for search_path in search_paths),
         ]
         matches: list[ExportSearchMatch] = []
         limited = False
@@ -198,6 +199,18 @@ class TgExportTxtService:
             raise ValueError(message)
 
         return matches, limited
+
+    def _resolve_search_paths(self, resolved: Path) -> list[Path]:
+        if resolved.is_file():
+            if resolved.suffix != ".txt":
+                raise ValueError("Only .txt export files can be searched.")
+            return [resolved]
+
+        return sorted(
+            (candidate for candidate in resolved.rglob("*.txt") if candidate.is_file()),
+            key=self.display_path,
+            reverse=True,
+        )
 
     def _build_file_entry(self, path: Path) -> ExportFileEntry:
         return ExportFileEntry(

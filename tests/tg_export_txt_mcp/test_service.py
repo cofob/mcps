@@ -137,6 +137,8 @@ def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
     assert matches[0].line_number == 2
     assert matches[0].line_text == "match me"
     popen_mock.assert_called_once()
+    called_command = popen_mock.call_args.args[0]
+    assert called_command[-1] == str(export_file)
 
 
 def test_search_exports_stops_after_max_results(tmp_path: Path) -> None:
@@ -175,9 +177,36 @@ def test_search_exports_stops_after_max_results(tmp_path: Path) -> None:
 def test_search_exports_rejects_missing_rg(tmp_path: Path) -> None:
     settings = TgExportTxtSettings(TG_EXPORT_TXT_ROOT_DIR=tmp_path, TG_EXPORT_TXT_RG_PATH="missing-rg")
     service = TgExportTxtService(settings)
+    export_file = tmp_path / "chats" / "123" / "2026-03-w3.txt"
+    export_file.parent.mkdir(parents=True)
+    export_file.write_text("match me\n", encoding="utf-8")
 
     with (
         patch("tg_export_txt_mcp.service.subprocess.Popen", side_effect=FileNotFoundError),
         pytest.raises(ValueError, match="rg executable not found"),
     ):
         service.search_exports(".", "match")
+
+
+def test_search_exports_searches_newest_files_first(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    chat_dir = tmp_path / "chats" / "123"
+    chat_dir.mkdir(parents=True)
+    older_file = chat_dir / "2026-03-w2.txt"
+    newer_file = chat_dir / "2026-03-w3.txt"
+    older_file.write_text("older match\n", encoding="utf-8")
+    newer_file.write_text("newer match\n", encoding="utf-8")
+
+    process = Mock()
+    process.stdout = iter(())
+    process.stderr = Mock(read=Mock(return_value=""))
+    process.wait = Mock(return_value=1)
+    process.poll = Mock(return_value=1)
+
+    with patch("tg_export_txt_mcp.service.subprocess.Popen", return_value=process) as popen_mock:
+        matches, limited = service.search_exports("chats/123", "match", max_results=10)
+
+    assert matches == []
+    assert not limited
+    called_command = popen_mock.call_args.args[0]
+    assert called_command[-2:] == [str(newer_file), str(older_file)]
