@@ -1,350 +1,116 @@
 # MCP Servers
 
-This repository contains four HTTP MCP servers implemented in Python 3.12+ with `uv`, `FastMCP`, strict `mypy`, and `ruff`.
+This repository contains four HTTP MCP servers implemented in Python 3.12+ with `uv`, `FastMCP`, `ruff`, `mypy`, and `pytest`.
 
-Every server exposes:
+Each service exposes:
 
-- MCP over `http://<host>:<port>/mcp`
-- health check over `http://<host>:<port>/healthz`
+- `POST /mcp` for the MCP transport
+- `GET /healthz` for a basic health check
 
-Repository: `cofob/mcps`  
-Container namespace: `ghcr.io/cofob/mcps/<service>`
-
-## Navigation
-
-- [Services](#services)
-- [Development](#development)
-- [Running Locally](#running-locally)
-- [Deployment](#deployment)
-- [HTTP Endpoints](#http-endpoints)
-- [Configuration](#configuration)
-- [Service Notes](#service-notes)
-- [CI/CD](#cicd)
+Repository: `cofob/mcps`
 
 ## Services
 
+### `filesystem-mcp`
+
+Filesystem MCP server for one configured root directory.
+
+Highlights:
+
+- read files and metadata
+- list directories and trees
+- search by filename and file contents
+- write, copy, move, delete, modify, and patch files
+
+Package: [services/filesystem_mcp](/Users/cofob/Development/mcps/services/filesystem_mcp)
+
+Published image:
+
+- `ghcr.io/cofob/filesystem-mcp`
+
 ### `navidrome-mcp`
 
-MCP server for [Navidrome](https://www.navidrome.org/) using the Subsonic-compatible API.
+Remote MCP server for [Navidrome](https://www.navidrome.org/) using its Subsonic-compatible API.
 
-Primary use cases:
+Highlights:
 
-- search artists, albums, and tracks
+- search artists, albums, tracks, and playlists
 - fetch artist, album, track, and playlist details
-- list artists, albums, playlists, starred items, random tracks, and tracks by genre
-- set ratings
-- like and unlike items
-- create, update, and delete playlists
+- list artists, albums, playlists, starred items, and random tracks
+- rate, like, unlike, and manage playlists
 
-Implemented against the local Navidrome source tree at `/Users/cofob/Development/navidrome`.
+Package: [services/navidrome_mcp](/Users/cofob/Development/mcps/services/navidrome_mcp)
 
-Exposed tools:
+Published image:
 
-- `navidrome_search`
-- `navidrome_get_artist`
-- `navidrome_get_album`
-- `navidrome_get_track`
-- `navidrome_get_playlist`
-- `navidrome_list_artists`
-- `navidrome_list_albums`
-- `navidrome_list_playlists`
-- `navidrome_list_starred`
-- `navidrome_list_random_tracks`
-- `navidrome_list_tracks_by_genre`
-- `navidrome_rate`
-- `navidrome_like`
-- `navidrome_unlike`
-- `navidrome_create_playlist`
-- `navidrome_update_playlist`
-- `navidrome_delete_playlist`
-- `navidrome_get_public_share_link`
-
-Tool inputs and outputs:
-
-- `navidrome_search(query: str, search_type: str = "all", limit: int = 10) -> str`
-  Input: search text, optional result type filter (`all`, `artists`, `albums`, `tracks`), optional per-type limit.
-  Output: readable search summary with artist, album, and track sections.
-- `navidrome_get_artist(artist_id: str) -> str`
-  Input: Navidrome/Subsonic artist id.
-  Output: readable artist card with normalized metadata.
-- `navidrome_get_album(album_id: str) -> str`
-  Input: Navidrome/Subsonic album id.
-  Output: readable album card with normalized metadata.
-- `navidrome_get_track(track_id: str) -> str`
-  Input: Navidrome/Subsonic track id.
-  Output: readable track card with normalized metadata.
-- `navidrome_get_playlist(playlist_id: str) -> str`
-  Input: playlist id.
-  Output: readable playlist summary with metadata and entries.
-- `navidrome_list_artists(music_folder_id: str | None = None) -> str`
-  Input: optional music folder id.
-  Output: readable artist listing.
-- `navidrome_list_albums(list_type: str, genre: str | None = None, from_year: int | None = None, to_year: int | None = None, size: int = 10, offset: int = 0) -> str`
-  Input: Subsonic album list mode plus optional filters and pagination.
-  Output: readable album listing.
-- `navidrome_list_playlists() -> str`
-  Input: none.
-  Output: readable playlist list.
-- `navidrome_list_starred(music_folder_id: str | None = None) -> str`
-  Input: optional music folder id.
-  Output: readable grouped starred items summary.
-- `navidrome_list_random_tracks(size: int = 10, genre: str | None = None) -> str`
-  Input: number of tracks and optional genre filter.
-  Output: readable random track list.
-- `navidrome_list_tracks_by_genre(genre: str, count: int = 10, offset: int = 0) -> str`
-  Input: genre name plus count and offset.
-  Output: readable track list for that genre.
-- `navidrome_rate(item_type: str, item_id: str, rating: int) -> str`
-  Input: item type label for the response text, item id, rating from `0` to `5`.
-  Output: short mutation confirmation string.
-- `navidrome_like(item_type: str, item_ids: list[str]) -> str`
-  Input: item type (`artist`, `album`, `track`) and one or more ids.
-  Output: short mutation confirmation string.
-- `navidrome_unlike(item_type: str, item_ids: list[str]) -> str`
-  Input: item type (`artist`, `album`, `track`) and one or more ids.
-  Output: short mutation confirmation string.
-- `navidrome_create_playlist(name: str, song_ids: list[str] | None = None) -> str`
-  Input: playlist name and optional initial track ids.
-  Output: short creation summary including playlist id.
-- `navidrome_update_playlist(playlist_id: str, name: str | None = None, comment: str | None = None, public: bool | None = None, song_ids_to_add: list[str] | None = None, song_indexes_to_remove: list[int] | None = None) -> str`
-  Input: playlist id and any combination of metadata or track updates.
-  Output: short update confirmation string.
-- `navidrome_delete_playlist(playlist_id: str) -> str`
-  Input: playlist id.
-  Output: short deletion confirmation string.
-- `navidrome_get_public_share_link(item_ids: list[str], description: str | None = None, expires: str | None = None) -> str`
-  Input: one or more Navidrome item ids plus optional description and expiration timestamp string.
-  Output: readable public share url summary.
+- `ghcr.io/cofob/navidrome-mcp`
 
 ### `slskd-mcp`
 
-MCP server for [slskd](https://github.com/slskd/slskd) using the slskd REST API.
+Remote MCP server for [slskd](https://github.com/slskd/slskd).
 
-Primary use cases:
+Highlights:
 
-- create searches and wait for readable final results
-- inspect existing searches when needed
-- inspect users and browse user shares
+- create and inspect searches
+- inspect users and browse shares
 - request downloads
-- inspect downloads, queue positions, uploads, and files
-- cancel or clear transfers
+- inspect and manage downloads and uploads
+- list files from configured slskd locations
 
-Implemented against the local slskd source tree at `/Users/cofob/Development/slskd`.
+Package: [services/slskd_mcp](/Users/cofob/Development/mcps/services/slskd_mcp)
 
-Exposed tools:
+Published image:
 
-- `slskd_create_search`
-- `slskd_list_searches`
-- `slskd_get_search`
-- `slskd_get_search_results`
-- `slskd_cancel_search`
-- `slskd_delete_search`
-- `slskd_get_user`
-- `slskd_browse_user`
-- `slskd_request_downloads`
-- `slskd_list_downloads`
-- `slskd_get_download`
-- `slskd_get_download_queue_position`
-- `slskd_cancel_download`
-- `slskd_clear_completed_downloads`
-- `slskd_list_uploads`
-- `slskd_get_upload`
-- `slskd_list_files`
-
-Tool inputs and outputs:
-
-- `slskd_create_search(search_text: str, response_limit: int = 100, file_limit: int = 10000, search_timeout: int = 15, filter_responses: bool = True, minimum_response_file_count: int = 1, maximum_peer_queue_length: int = 1000000, minimum_peer_upload_speed: int = 0, limit: int = 50) -> str`
-  Input: search text and slskd search tuning parameters. For music searches, use minimal filename-like terms (artist + album/title keywords) rather than long natural-language phrases. Example: `Gesaffelstein enter the gamma`.
-  Output: waits for search completion and returns a readable flattened file result list.
-- `slskd_list_searches() -> str`
-  Input: none.
-  Output: readable list of tracked searches with ids and search text.
-- `slskd_get_search(search_id: UUID) -> str`
-  Input: search UUID.
-  Output: short readable summary for one search.
-- `slskd_get_search_results(search_id: UUID, search_type: str = "all", output_format: str = "both", limit: int = 50) -> str`
-  Input: search UUID and display controls.
-  Output: readable flattened file result list, intended for choosing download candidates.
-- `slskd_cancel_search(search_id: UUID) -> str`
-  Input: search UUID.
-  Output: short cancellation confirmation string.
-- `slskd_delete_search(search_id: UUID) -> str`
-  Input: search UUID.
-  Output: short deletion confirmation string.
-- `slskd_get_user(action: str, username: str, directory: str | None = None) -> str`
-  Input: `action` of `status`, `info`, `endpoint`, or `directory`; username; optional directory for `directory` action.
-  Output: readable summary prefixed by the action name.
-- `slskd_browse_user(username: str) -> str`
-  Input: username.
-  Output: readable browse tree summary.
-- `slskd_request_downloads(username: str, files: list[SlskdDownloadRequest]) -> str`
-  Input: username and one or more file requests, each containing `filename` and `size`.
-  Output: confirmation plus slskd response summary.
-- `slskd_list_downloads(include_removed: bool = False) -> str`
-  Input: whether removed downloads should be included.
-  Output: readable downloads summary.
-- `slskd_get_download(username: str, transfer_id: str) -> str`
-  Input: username and transfer id.
-  Output: readable download summary.
-- `slskd_get_download_queue_position(username: str, transfer_id: str) -> str`
-  Input: username and transfer id.
-  Output: readable queue position summary.
-- `slskd_cancel_download(username: str, transfer_id: str, remove: bool = False) -> str`
-  Input: username, transfer id, and optional `remove` flag.
-  Output: short cancellation confirmation string.
-- `slskd_clear_completed_downloads() -> str`
-  Input: none.
-  Output: short confirmation string.
-- `slskd_list_uploads(include_removed: bool = False) -> str`
-  Input: whether removed uploads should be included.
-  Output: readable uploads summary.
-- `slskd_get_upload(username: str, transfer_id: str) -> str`
-  Input: username and transfer id.
-  Output: readable upload summary.
-- `slskd_list_files(location: str, subdirectory: str | None = None, recursive: bool = False) -> str`
-  Input: `location` of `downloads` or `incomplete`, optional subdirectory, optional recursive listing.
-  Output: readable directory summary.
-
-### `filesystem-mcp`
-
-Filesystem MCP server for one configured root directory. It is based on the patterns used in the other servers in this repository and reimplements the reference server at `/Users/cofob/Development/mcp-filesystem-server` in Python.
-
-Primary use cases:
-
-- read files and file metadata
-- list directories and directory trees
-- search by filename and inside files
-- write, copy, move, delete, and modify files
-- apply unified diff patches with `patch_file`
-
-Safety properties:
+- `ghcr.io/cofob/slskd-mcp`
 
 ### `tg-export-txt-mcp`
 
 Read-only MCP server for TXT exports generated by `tg_backup`.
 
-Primary use cases:
+Highlights:
 
-- search transcript content with `rg`
-- read transcript files by relative path
-- inspect the exported `chats.txt` mapping file when needed
+- `read_export_file` reads transcript files by relative path
+- `search_exports` searches transcript files with `rg`
+- access is restricted to one configured export root
 
-Exposed tools:
+Package: [services/tg_export_txt_mcp](/Users/cofob/Development/mcps/services/tg_export_txt_mcp)
 
-- `read_export_file`
-- `search_exports`
+Published image:
 
-Tool inputs and outputs:
+- `ghcr.io/cofob/tg-export-txt-mcp`
 
-- `read_export_file(path: str, start_line: int = 1, max_lines: int = 400) -> str`
-  Input: relative path to one exported `.txt` transcript file plus optional line window.
-  Output: readable file summary with absolute path and selected content lines.
-- `search_exports(path: str, query: str, max_results: int = 200) -> str`
-  Input: root-relative file or directory plus a ripgrep search query and optional result limit.
-  Output: readable list of `path:line: text` matches.
+## Workspace Layout
 
-- all reads and writes are confined to `FILESYSTEM_ROOT_DIR`
-- paths matching `FILESYSTEM_IGNORE_PATTERNS` or any nested `.gitignore` file are excluded from every filesystem tool
-- symlink and path traversal escapes outside the configured root are rejected
-- `patch_file` is restricted to files under the configured root in the same way as every other write tool
+```text
+packages/
+  mcp_common/
+services/
+  filesystem_mcp/
+  navidrome_mcp/
+  slskd_mcp/
+  tg_export_txt_mcp/
+docker/
+tests/
+```
 
-Exposed tools:
-
-- `read_file`
-- `read_multiple_files`
-- `list_directory`
-- `create_directory`
-- `tree`
-- `list_allowed_directories`
-- `get_file_info`
-- `search_files`
-- `search_within_files`
-- `write_file`
-- `copy_file`
-- `move_file`
-- `delete_file`
-- `modify_file`
-- `patch_file`
-
-Tool markers:
-
-- all tools expose MCP tags and annotations describing their behavior
-- common markers include `read-only`, `write`, `destructive`, `open-world`, and `closed-world`
-- remote tools in Navidrome and slskd are marked as `open-world`
-- local filesystem tools are marked as `closed-world`
-
-Tool inputs and outputs:
-
-- `read_file(path: str) -> str`
-  Input: one path under `FILESYSTEM_ROOT_DIR`.
-  Output: readable file view with text content inline when allowed, otherwise metadata and encoding details.
-- `read_multiple_files(paths: list[str]) -> str`
-  Input: multiple paths under `FILESYSTEM_ROOT_DIR`.
-  Output: readable multi-file report.
-- `list_directory(path: str) -> str`
-  Input: one directory path.
-  Output: readable directory listing.
-- `create_directory(path: str) -> str`
-  Input: directory path to create.
-  Output: short creation confirmation string.
-- `tree(path: str, depth: int = 3, follow_symlinks: bool = False) -> str`
-  Input: root path, tree depth, and optional symlink traversal.
-  Output: readable directory tree.
-- `list_allowed_directories() -> str`
-  Input: none.
-  Output: readable list of configured accessible roots.
-- `get_file_info(path: str) -> str`
-  Input: file or directory path.
-  Output: readable metadata summary including timestamps, type, size, and permissions.
-- `search_files(path: str, pattern: str) -> str`
-  Input: root path and filename glob pattern.
-  Output: readable list of matching file and directory names.
-- `search_within_files(path: str, substring: str, depth: int = 0, max_results: int = 1000) -> str`
-  Input: root path, plain-text substring, optional depth, optional result cap.
-  Output: readable match list with file paths and line numbers.
-- `write_file(path: str, content: str) -> str`
-  Input: target path and full file content.
-  Output: short write confirmation with byte count.
-- `copy_file(source: str, destination: str) -> str`
-  Input: source path and destination path.
-  Output: short copy confirmation string.
-- `move_file(source: str, destination: str) -> str`
-  Input: source path and destination path.
-  Output: short move confirmation string.
-- `delete_file(path: str, recursive: bool = False) -> str`
-  Input: target path and optional recursive flag for directories.
-  Output: short deletion confirmation string.
-- `modify_file(path: str, find: str, replace: str, all_occurrences: bool = True, regex: bool = False) -> str`
-  Input: target path, find text or pattern, replacement text, and matching controls.
-  Output: short summary with replacement count.
-- `patch_file(path: str, patch: str) -> str`
-  Input: target path and unified diff patch text.
-
-  Example patch format:
-
-  ```diff
-  --- test.md
-  +++ test.md
-  @@ -2 +2 @@
-  -Line 2
-  +Line 2 updated
-  ```
-  Output: short summary with changed line count.
+- [packages/mcp_common](/Users/cofob/Development/mcps/packages/mcp_common) contains shared settings, HTTP, auth, and tool-registration helpers.
+- Each service is a separate workspace package under [services](/Users/cofob/Development/mcps/services).
+- Shared tests live under [tests](/Users/cofob/Development/mcps/tests).
 
 ## Development
 
-### Requirements
+Requirements:
 
 - Python 3.12+
 - `uv`
 
-### Install
+Install the workspace:
 
 ```bash
 uv sync --all-packages --group dev
 ```
 
-### Quality gates
+Quality checks:
 
 ```bash
 uv run ruff check .
@@ -354,7 +120,7 @@ uv run pytest
 
 ## Running Locally
 
-Run each server from the workspace root with the required environment variables set.
+Run services from the workspace root.
 
 ### Navidrome
 
@@ -403,68 +169,19 @@ export PORT="8082"
 uv run --package filesystem-mcp filesystem-mcp
 ```
 
-## Deployment
-
-Each service has a dedicated Dockerfile under [docker](/Users/cofob/.codex/worktrees/4b01/mcps/docker), and CI builds and publishes images from [.github/workflows/ci.yml](/Users/cofob/.codex/worktrees/4b01/mcps/.github/workflows/ci.yml).
-
-Expected image names for this repository:
-
-- `ghcr.io/cofob/mcps/navidrome-mcp`
-- `ghcr.io/cofob/mcps/slskd-mcp`
-- `ghcr.io/cofob/mcps/filesystem-mcp`
-
-### Example `docker run`
-
-Navidrome:
+### tg-export-txt
 
 ```bash
-docker run --rm -p 8080:8080 \
-  -e NAVIDROME_URL="https://navidrome.example.com" \
-  -e NAVIDROME_USERNAME="alice" \
-  -e NAVIDROME_PASSWORD="secret" \
-  ghcr.io/cofob/mcps/navidrome-mcp:latest
+export TG_EXPORT_TXT_ROOT_DIR="/path/to/tg_backup/txt"
+export HOST="0.0.0.0"
+export PORT="8083"
+
+uv run --package tg-export-txt-mcp tg-export-txt-mcp
 ```
 
-slskd:
+## Common Configuration
 
-```bash
-docker run --rm -p 8081:8081 \
-  -e SLSKD_URL="https://slskd.example.com" \
-  -e SLSKD_API_KEY="your-api-key" \
-  ghcr.io/cofob/mcps/slskd-mcp:latest
-```
-
-filesystem:
-
-```bash
-docker run --rm -p 8082:8082 \
-  -e FILESYSTEM_ROOT_DIR="/workspace" \
-  -v "$PWD:/workspace" \
-  ghcr.io/cofob/mcps/filesystem-mcp:latest
-```
-
-## HTTP Endpoints
-
-For every service:
-
-- `GET /healthz` returns JSON health data
-- `POST /mcp` serves the MCP transport
-
-Example health response:
-
-```json
-{
-  "status": "ok",
-  "service": "navidrome-mcp",
-  "version": "0.1.0"
-}
-```
-
-## Configuration
-
-### Common environment variables
-
-All services support:
+All services share these environment variables through [mcp_common](/Users/cofob/Development/mcps/packages/mcp_common):
 
 - `HOST`
 - `PORT`
@@ -475,228 +192,50 @@ All services support:
 Defaults:
 
 - `HOST=0.0.0.0`
-- `PORT=8080` unless the container sets a service-specific default
+- `PORT=8080`
 - `LOG_LEVEL=INFO`
 - `TIMEOUT_SECONDS=20.0`
 - `MCP_AUTH_MODE=none`
 
-### Tool configuration
+Tool gating is also shared across services via the nested `TOOLS` settings object.
 
-Tool gating is shared across all services.
-
-Available settings:
-
-- `enabled_tools`
-- `disabled_tools`
-- `disabled_tool_groups`
-
-These are currently loaded through the nested `TOOLS` settings object. In practice, set them as JSON:
+Example:
 
 ```bash
 export TOOLS='{"disabled_tool_groups":["mutate"]}'
 ```
 
-Examples:
+## Docker And CI
 
-Disable all mutating tools:
+Dockerfiles live under [docker](/Users/cofob/Development/mcps/docker).
 
-```bash
-export TOOLS='{"disabled_tool_groups":["mutate"]}'
+Current CI in [ci.yml](/Users/cofob/Development/mcps/.github/workflows/ci.yml):
+
+- runs `ruff`, `mypy`, and `pytest` on pull requests to `main`
+- runs the same lint/test job on tag pushes matching `v*`
+- builds Docker images after the lint job
+- pushes images to GHCR only on non-PR runs, which in the current workflow means tag pushes
+
+Docker images currently built by CI:
+
+- `ghcr.io/cofob/filesystem-mcp`
+- `ghcr.io/cofob/navidrome-mcp`
+- `ghcr.io/cofob/slskd-mcp`
+- `ghcr.io/cofob/tg-export-txt-mcp`
+
+## HTTP Endpoints
+
+Every service exposes:
+
+- `GET /healthz`
+- `POST /mcp`
+
+Example health response:
+
+```json
+{
+  "status": "ok",
+  "service": "navidrome-mcp",
+  "version": "0.1.0"
+}
 ```
-
-Allow only a small read-only subset:
-
-```bash
-export TOOLS='{"enabled_tools":["navidrome_search","navidrome_get_album","navidrome_get_track"]}'
-```
-
-Disable one specific tool:
-
-```bash
-export TOOLS='{"disabled_tools":["patch_file"]}'
-```
-
-Precedence:
-
-1. `enabled_tools` acts as an allowlist when set
-2. `disabled_tool_groups` disables matching tool groups
-3. `disabled_tools` disables named tools
-
-### OAuth2 for `/mcp`
-
-OAuth2 MCP authentication is optional and is disabled by default.
-
-To enable it:
-
-```bash
-export MCP_AUTH_MODE="oauth2"
-export OAUTH2='{
-  "strategy":"bearer",
-  "issuer_url":"https://auth.example.com/",
-  "jwks_uri":"https://auth.example.com/.well-known/jwks.json",
-  "audience":"mcps"
-}'
-```
-
-Notes:
-
-- only bearer-token verification is implemented
-- `issuer_url`, `jwks_uri`, and `audience` are required for OAuth2 mode
-- because `oauth2` is a nested settings model, it is configured through the `OAUTH2` JSON value
-
-### Keycloak / OIDC guide
-
-This repository acts as a resource server for `/mcp`. It does not perform the OAuth login flow itself.
-The MCP client obtains a bearer token from Keycloak and sends it in `Authorization: Bearer ...`.
-
-Minimal-friction setup:
-
-1. Create or choose a Keycloak realm.
-2. Create one client to represent this MCP API, for example `mcps`.
-3. Configure this repository with that realm issuer, JWKS endpoint, and client ID as the expected audience.
-4. Make sure the tokens your MCP client sends include `aud: "mcps"`.
-
-Recommended environment variables:
-
-```bash
-export MCP_AUTH_MODE="oauth2"
-export OAUTH2='{
-  "strategy":"bearer",
-  "issuer_url":"https://keycloak.example.com/realms/myrealm",
-  "jwks_uri":"https://keycloak.example.com/realms/myrealm/protocol/openid-connect/certs",
-  "audience":"mcps"
-}'
-```
-
-Keycloak values:
-
-- `issuer_url`: realm issuer, usually `https://<host>/realms/<realm>`
-- `jwks_uri`: realm certs endpoint, usually `https://<host>/realms/<realm>/protocol/openid-connect/certs`
-- `audience`: the client ID you want this MCP server to accept, for example `mcps`
-
-Practical Keycloak setup:
-
-1. Create client `mcps`.
-2. If you want machine-to-machine access, enable `Client authentication` and `Service accounts roles`.
-3. If you want user login from another client, keep that caller client separate and add an Audience mapper so issued tokens include `mcps` in `aud`.
-
-Common failure mode:
-
-- the token is valid, but `/mcp` still rejects it because `aud` does not include the configured value
-
-If that happens, add an Audience mapper in Keycloak:
-
-1. Create a client scope such as `mcps-audience`.
-2. Add mapper type `Audience`.
-3. Set `Included Client Audience` to `mcps`.
-4. Attach that client scope to the client that is requesting tokens.
-
-Quick token check:
-
-```bash
-python - <<'PY'
-import base64
-import json
-
-token = "PASTE_ACCESS_TOKEN_HERE"
-payload = token.split(".")[1]
-payload += "=" * (-len(payload) % 4)
-print(json.dumps(json.loads(base64.urlsafe_b64decode(payload)), indent=2))
-PY
-```
-
-Confirm these claims match your MCP config:
-
-- `iss` equals `issuer_url`
-- `aud` contains `mcps` or your chosen audience value
-
-Client credentials example:
-
-```bash
-curl -s \
-  -d grant_type=client_credentials \
-  -d client_id=mcps \
-  -d client_secret="$KEYCLOAK_CLIENT_SECRET" \
-  "https://keycloak.example.com/realms/myrealm/protocol/openid-connect/token"
-```
-
-Use the returned `access_token` when calling `/mcp`.
-
-### Navidrome configuration
-
-Required:
-
-- `NAVIDROME_URL`
-- `NAVIDROME_USERNAME`
-- `NAVIDROME_PASSWORD`
-
-Optional:
-
-- `NAVIDROME_CLIENT_NAME`  
-  Default: `navidrome-mcp`
-- `NAVIDROME_API_VERSION`  
-  Default: `1.16.1`
-
-### slskd configuration
-
-Required:
-
-- `SLSKD_URL`
-- one of:
-  - `SLSKD_API_KEY`
-  - `SLSKD_USERNAME` and `SLSKD_PASSWORD`
-
-Optional:
-
-- `SLSKD_SEARCH_POLL_INTERVAL_SECONDS`
-
-### Filesystem configuration
-
-Required:
-
-- `FILESYSTEM_ROOT_DIR`
-
-Optional:
-
-- `FILESYSTEM_IGNORE_PATTERNS`
-- `FILESYSTEM_MAX_INLINE_SIZE`
-- `FILESYSTEM_MAX_BASE64_SIZE`
-- `FILESYSTEM_MAX_SEARCH_RESULTS`
-- `FILESYSTEM_MAX_SEARCHABLE_SIZE`
-
-Default values:
-
-- `FILESYSTEM_IGNORE_PATTERNS=[]`
-- `FILESYSTEM_MAX_INLINE_SIZE=5242880`
-- `FILESYSTEM_MAX_BASE64_SIZE=1048576`
-- `FILESYSTEM_MAX_SEARCH_RESULTS=1000`
-- `FILESYSTEM_MAX_SEARCHABLE_SIZE=10485760`
-
-`FILESYSTEM_IGNORE_PATTERNS` accepts a JSON array of `.gitignore`-style patterns such as
-`[".git","node_modules/","*.log","secret/*.txt"]`. These rules are combined with `.gitignore`
-files found in the root directory and nested subdirectories. Matching files and directories are
-hidden from listings and searches and are rejected by direct read/write/modify/delete operations.
-
-## Service Notes
-
-### Navidrome output style
-
-Navidrome tools return readable text for MCP clients rather than raw upstream JSON. The server normalizes mixed Subsonic response shapes into cleaner text output for albums, artists, tracks, and playlists.
-
-### slskd output style
-
-slskd tools return readable summaries designed for LLM use. Search result tools flatten file results into concise, actionable lists rather than returning raw API payloads.
-
-### Filesystem resources
-
-The filesystem server also exposes a `file://{path*}` MCP resource for files under the configured root directory.
-
-## CI/CD
-
-CI runs:
-
-- `ruff`
-- `mypy`
-- `pytest`
-
-Docker build and publish runs from [.github/workflows/ci.yml](/Users/cofob/.codex/worktrees/4b01/mcps/.github/workflows/ci.yml) using the Dockerfiles under [docker](/Users/cofob/.codex/worktrees/4b01/mcps/docker).
