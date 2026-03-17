@@ -14,6 +14,9 @@ class CliTools:
           export root.
         - The command line is passed through to Bash directly, so pipes, redirects,
           command substitution, and chaining are available.
+        - Prefer this tool over the higher-level search helpers when you need full-text
+          search across many files, exact raw ``rg`` behavior, or shell composition
+          such as ``rg ... | head`` and ``rg ... | sed ...``.
 
         How to call it:
         - Search a chat directory:
