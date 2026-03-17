@@ -170,7 +170,11 @@ class TgExportTxtService:
         if effective_max_results <= 0:
             raise ValueError("max_results must be greater than 0.")
         start_bound, end_bound = self._parse_date_bounds(start_date, end_date)
-        search_paths = self._resolve_search_paths(resolved, start_bound=start_bound, end_bound=end_bound)
+        search_paths, use_glob = self._resolve_search_paths(
+            resolved,
+            start_bound=start_bound,
+            end_bound=end_bound,
+        )
         if not search_paths:
             return [], False
 
@@ -182,6 +186,7 @@ class TgExportTxtService:
             str(effective_max_results),
             "--color=never",
             "--smart-case",
+            *(["--glob", "*.txt"] if use_glob else []),
             query,
             *(str(search_path) for search_path in search_paths),
         ]
@@ -236,13 +241,16 @@ class TgExportTxtService:
         *,
         start_bound: date | None = None,
         end_bound: date | None = None,
-    ) -> list[Path]:
+    ) -> tuple[list[Path], bool]:
         if resolved.is_file():
             if resolved.suffix != ".txt":
                 raise ValueError("Only .txt export files can be searched.")
             if not self._matches_date_bounds(resolved, start_bound=start_bound, end_bound=end_bound):
-                return []
-            return [resolved]
+                return [], False
+            return [resolved], False
+
+        if start_bound is None and end_bound is None:
+            return [resolved], True
 
         return sorted(
             (
@@ -253,7 +261,7 @@ class TgExportTxtService:
             ),
             key=self.display_path,
             reverse=True,
-        )
+        ), False
 
     def _parse_date_bounds(
         self,

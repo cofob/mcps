@@ -156,7 +156,9 @@ def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
     assert matches[0].line_text == "match me"
     popen_mock.assert_called_once()
     called_command = popen_mock.call_args.args[0]
-    assert called_command[-1] == str(export_file)
+    assert called_command[-1] == str(tmp_path)
+    assert "--glob" in called_command
+    assert "*.txt" in called_command
 
 
 def test_search_exports_stops_after_max_results(tmp_path: Path) -> None:
@@ -206,14 +208,12 @@ def test_search_exports_rejects_missing_rg(tmp_path: Path) -> None:
         service.search_exports(".", "match")
 
 
-def test_search_exports_searches_newest_files_first(tmp_path: Path) -> None:
+def test_search_exports_uses_compact_directory_search_without_date_filters(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     chat_dir = tmp_path / "chats" / "123"
     chat_dir.mkdir(parents=True)
-    older_file = chat_dir / "2026-03-w2.txt"
-    newer_file = chat_dir / "2026-03-w3.txt"
-    older_file.write_text("older match\n", encoding="utf-8")
-    newer_file.write_text("newer match\n", encoding="utf-8")
+    (chat_dir / "2026-03-w2.txt").write_text("older match\n", encoding="utf-8")
+    (chat_dir / "2026-03-w3.txt").write_text("newer match\n", encoding="utf-8")
 
     process = Mock()
     process.stdout = iter(())
@@ -227,7 +227,9 @@ def test_search_exports_searches_newest_files_first(tmp_path: Path) -> None:
     assert matches == []
     assert not limited
     called_command = popen_mock.call_args.args[0]
-    assert called_command[-2:] == [str(newer_file), str(older_file)]
+    assert called_command[-1] == str(chat_dir)
+    assert "--glob" in called_command
+    assert "*.txt" in called_command
 
 
 def test_search_exports_filters_by_date_range(tmp_path: Path) -> None:
@@ -259,6 +261,7 @@ def test_search_exports_filters_by_date_range(tmp_path: Path) -> None:
     assert matches == []
     assert not limited
     called_command = popen_mock.call_args.args[0]
+    assert "--glob" not in called_command
     assert called_command[-1] == str(matching_file)
 
 
