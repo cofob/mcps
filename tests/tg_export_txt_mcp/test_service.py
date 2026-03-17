@@ -152,6 +152,10 @@ def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
     assert not limited
     assert len(matches) == 1
     assert matches[0].path == "chats/123/2026-03-w3.txt"
+    assert matches[0].chat_id == "123"
+    assert matches[0].topic_id is None
+    assert matches[0].bucket_label == "2026-03-w3"
+    assert matches[0].rank_score > 0
     assert matches[0].line_number == 2
     assert matches[0].line_text == "match me"
     popen_mock.assert_called_once()
@@ -182,15 +186,15 @@ def test_search_exports_stops_after_max_results(tmp_path: Path) -> None:
     process = Mock()
     process.stdout = iter(f"{line}\n" for line in rg_lines)
     process.stderr = Mock(read=Mock(return_value=""))
-    process.wait = Mock(return_value=-15)
-    process.poll = Mock(side_effect=[None, -15])
+    process.wait = Mock(return_value=0)
+    process.poll = Mock(return_value=0)
 
     with patch("tg_export_txt_mcp.service.subprocess.Popen", return_value=process):
         matches, limited = service.search_exports(".", "match", max_results=2)
 
     assert limited
     assert [match.line_number for match in matches] == [1, 2]
-    process.terminate.assert_called_once()
+    process.terminate.assert_not_called()
     process.kill.assert_not_called()
 
 
@@ -263,6 +267,60 @@ def test_search_exports_filters_by_date_range(tmp_path: Path) -> None:
     called_command = popen_mock.call_args.args[0]
     assert "--glob" not in called_command
     assert called_command[-1] == str(matching_file)
+
+
+def test_search_exports_filters_by_chat_topic_prefix_and_filename(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    topic_dir = tmp_path / "chats" / "123" / "42"
+    topic_dir.mkdir(parents=True)
+    matching_file = topic_dir / "2026-03-w3.txt"
+    non_matching_file = tmp_path / "chats" / "123" / "99" / "2026-03-w3.txt"
+    non_matching_file.parent.mkdir(parents=True)
+    matching_file.write_text("release candidate\n", encoding="utf-8")
+    non_matching_file.write_text("release candidate\n", encoding="utf-8")
+
+    process = Mock()
+    process.stdout = iter(())
+    process.stderr = Mock(read=Mock(return_value=""))
+    process.wait = Mock(return_value=1)
+    process.poll = Mock(return_value=1)
+
+    with patch("tg_export_txt_mcp.service.subprocess.Popen", return_value=process) as popen_mock:
+        matches, limited = service.search_exports(
+            "chats",
+            "release",
+            chat_id="123",
+            topic_id="42",
+            path_prefix="chats/123/42",
+            filename_glob="2026-03-*.txt",
+        )
+
+    assert matches == []
+    assert not limited
+    called_command = popen_mock.call_args.args[0]
+    assert called_command[-1] == str(matching_file)
+    assert str(non_matching_file) not in called_command
+
+
+def test_search_exports_supports_case_sensitive_and_whole_word(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    export_file = tmp_path / "chats" / "123" / "2026-03-w3.txt"
+    export_file.parent.mkdir(parents=True)
+    export_file.write_text("Token\n", encoding="utf-8")
+
+    process = Mock()
+    process.stdout = iter(())
+    process.stderr = Mock(read=Mock(return_value=""))
+    process.wait = Mock(return_value=1)
+    process.poll = Mock(return_value=1)
+
+    with patch("tg_export_txt_mcp.service.subprocess.Popen", return_value=process) as popen_mock:
+        service.search_exports(".", "Token", case_sensitive=True, whole_word=True)
+
+    called_command = popen_mock.call_args.args[0]
+    assert "--case-sensitive" in called_command
+    assert "--word-regexp" in called_command
+    assert "--smart-case" not in called_command
 
 
 def test_search_exports_rejects_invalid_date_range(tmp_path: Path) -> None:

@@ -1,12 +1,30 @@
 from collections.abc import Sequence
 
 from tg_export_txt_mcp.models import (
+    CliCommandResult,
     ExportChatEntry,
     ExportFileEntry,
     ExportReadResult,
     ExportSearchMatch,
     ExportTopicEntry,
 )
+
+
+def format_cli_result(result: CliCommandResult) -> str:
+    lines = [
+        f"Command: {result.command}",
+        f"Cwd: {result.cwd}",
+        f"Exit code: {result.exit_code}",
+        "",
+        "Stdout",
+        result.stdout or "<empty>",
+        "",
+        "Stderr",
+        result.stderr or "<empty>",
+    ]
+    if result.truncated:
+        lines.extend(["", "Output was truncated at the configured max_cli_output_chars limit."])
+    return "\n".join(lines)
 
 
 def format_read_result(result: ExportReadResult) -> str:
@@ -30,7 +48,15 @@ def format_search_results(
 ) -> str:
     lines = [f'Search for "{query}" under {base_path}: {len(matches)} match(es)']
     for index, match in enumerate(matches, start=1):
-        lines.append(f"{index}. {match.path}:{match.line_number}: {match.line_text}")
+        metadata: list[str] = [f"score={match.rank_score}"]
+        if match.chat_id is not None:
+            metadata.append(f"chat={match.chat_id}")
+        if match.topic_id is not None:
+            metadata.append(f"topic={match.topic_id}")
+        if match.bucket_label is not None:
+            metadata.append(f"bucket={match.bucket_label}")
+        metadata_text = ", ".join(metadata)
+        lines.append(f"{index}. {match.path}:{match.line_number}: {match.line_text} [{metadata_text}]")
     if limited:
         lines.extend(["", "Results were truncated at the configured max_search_results limit."])
     return "\n".join(lines)

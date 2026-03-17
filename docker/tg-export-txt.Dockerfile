@@ -14,7 +14,13 @@ RUN uv sync --package tg-export-txt-mcp
 FROM python:3.12-slim AS runtime
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ripgrep \
+    && apt-get install --yes --no-install-recommends \
+        bash \
+        coreutils \
+        findutils \
+        grep \
+        ripgrep \
+        sed \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

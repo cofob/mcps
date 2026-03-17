@@ -51,6 +51,12 @@ async def test_search_tool_formats_matches(tmp_path: Path) -> None:
             absolute_path=str(export_file),
             line_number=1,
             line_text="hello",
+            chat_id="123",
+            topic_id=None,
+            bucket_label="2026-03-w3",
+            bucket_start=None,
+            bucket_end=None,
+            rank_score=123,
         )
     ]
 
@@ -58,7 +64,7 @@ async def test_search_tool_formats_matches(tmp_path: Path) -> None:
         text = await SearchTools(service).search_exports(".", "hello")
 
     assert 'Search for "hello" under .' in text
-    assert "chats/123/2026-03-w3.txt:1: hello" in text
+    assert "chats/123/2026-03-w3.txt:1: hello [score=123, chat=123, bucket=2026-03-w3]" in text
 
 
 @pytest.mark.asyncio
@@ -73,6 +79,12 @@ async def test_search_tool_forwards_date_filters(tmp_path: Path) -> None:
             absolute_path=str(export_file),
             line_number=1,
             line_text="hello",
+            chat_id="123",
+            topic_id=None,
+            bucket_label="2026-03-w3",
+            bucket_start=None,
+            bucket_end=None,
+            rank_score=123,
         )
     ]
 
@@ -82,6 +94,12 @@ async def test_search_tool_forwards_date_filters(tmp_path: Path) -> None:
             "hello",
             start_date="2026-03-01",
             end_date="2026-03-17",
+            chat_id="123",
+            topic_id="42",
+            path_prefix="chats/123",
+            filename_glob="2026-03-*.txt",
+            case_sensitive=True,
+            whole_word=True,
         )
 
     search_mock.assert_called_once_with(
@@ -90,6 +108,12 @@ async def test_search_tool_forwards_date_filters(tmp_path: Path) -> None:
         max_results=200,
         start_date="2026-03-01",
         end_date="2026-03-17",
+        chat_id="123",
+        topic_id="42",
+        path_prefix="chats/123",
+        filename_glob="2026-03-*.txt",
+        case_sensitive=True,
+        whole_word=True,
     )
 
 

@@ -11,6 +11,7 @@ class TgExportTxtSettings(BaseServiceSettings):
     rg_path: str = Field(default="rg", alias="TG_EXPORT_TXT_RG_PATH")
     max_read_lines: int = Field(default=400, alias="TG_EXPORT_TXT_MAX_READ_LINES")
     max_search_results: int = Field(default=200, alias="TG_EXPORT_TXT_MAX_SEARCH_RESULTS")
+    max_cli_output_chars: int = Field(default=20000, alias="TG_EXPORT_TXT_MAX_CLI_OUTPUT_CHARS")
     tools: ToolSettings = Field(default_factory=ToolSettings)
 
     @field_validator("export_root_dir")
@@ -23,7 +24,7 @@ class TgExportTxtSettings(BaseServiceSettings):
             raise ValueError(f"Export root path is not a directory: {resolved}")
         return resolved
 
-    @field_validator("max_read_lines", "max_search_results")
+    @field_validator("max_read_lines", "max_search_results", "max_cli_output_chars")
     @classmethod
     def validate_positive_int(cls, value: int) -> int:
         if value <= 0:

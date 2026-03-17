@@ -17,7 +17,14 @@ from mcp_common.logging import configure_logging
 from tg_export_txt_mcp import __version__
 from tg_export_txt_mcp.config import TgExportTxtSettings
 from tg_export_txt_mcp.service import TgExportTxtService
-from tg_export_txt_mcp.tools import ChatTools, FileTools, ReadTools, SearchTools, TopicTools
+from tg_export_txt_mcp.tools import (
+    ChatTools,
+    CliTools,
+    FileTools,
+    ReadTools,
+    SearchTools,
+    TopicTools,
+)
 
 
 def _tool_spec(method: Callable[..., Awaitable[str]], name: str, *groups: str) -> ToolSpec:
@@ -38,12 +45,14 @@ def _tool_spec(method: Callable[..., Awaitable[str]], name: str, *groups: str) -
 
 
 def _make_tool_specs(service: TgExportTxtService) -> list[ToolSpec]:
+    cli_tools = CliTools(service)
     file_tools = FileTools(service)
     chat_tools = ChatTools(service)
     read_tools = ReadTools(service)
     search_tools = SearchTools(service)
     topic_tools = TopicTools(service)
     return [
+        _tool_spec(cli_tools.run_cli, "run_cli", "read"),
         _tool_spec(file_tools.list_export_files, "list_export_files", "read"),
         _tool_spec(chat_tools.list_chats, "list_chats", "read"),
         _tool_spec(chat_tools.search_chats, "search_chats", "read", "search"),
