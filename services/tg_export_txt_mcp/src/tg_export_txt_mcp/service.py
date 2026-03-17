@@ -1,6 +1,10 @@
+import calendar
+import difflib
 import json
+import re
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import date
 from pathlib import Path
 
 from tg_export_txt_mcp.config import TgExportTxtSettings
@@ -107,12 +111,11 @@ class TgExportTxtService:
         if effective_max_results <= 0:
             raise ValueError("max_results must be greater than 0.")
 
-        lowered_query = normalized_query.casefold()
-        matches = [
-            chat
-            for chat in chats
-            if lowered_query in chat.chat_id.casefold() or lowered_query in chat.chat_name.casefold()
-        ]
+        matches = self._fuzzy_match_entries(
+            chats,
+            normalized_query,
+            key_parts=lambda chat: (chat.chat_id, chat.chat_name),
+        )
         limited = len(matches) > effective_max_results
         return matches[:effective_max_results], limited
 
@@ -129,18 +132,45 @@ class TgExportTxtService:
         limited = len(topics) > effective_max_results
         return topics[:effective_max_results], limited
 
+    def search_topics(
+        self,
+        chat_id: str,
+        query: str,
+        *,
+        max_results: int | None = None,
+    ) -> tuple[list[ExportTopicEntry], bool]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            raise ValueError("query must not be empty.")
+
+        topics, _ = self.list_topics(chat_id, max_results=None)
+        effective_max_results = max_results or self._settings.max_search_results
+        if effective_max_results <= 0:
+            raise ValueError("max_results must be greater than 0.")
+
+        matches = self._fuzzy_match_entries(
+            topics,
+            normalized_query,
+            key_parts=lambda topic: (topic.topic_id, topic.topic_name),
+        )
+        limited = len(matches) > effective_max_results
+        return matches[:effective_max_results], limited
+
     def search_exports(
         self,
         path: str,
         query: str,
         *,
         max_results: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> tuple[list[ExportSearchMatch], bool]:
         resolved = self.resolve_path(path)
         effective_max_results = max_results or self._settings.max_search_results
         if effective_max_results <= 0:
             raise ValueError("max_results must be greater than 0.")
-        search_paths = self._resolve_search_paths(resolved)
+        start_bound, end_bound = self._parse_date_bounds(start_date, end_date)
+        search_paths = self._resolve_search_paths(resolved, start_bound=start_bound, end_bound=end_bound)
         if not search_paths:
             return [], False
 
@@ -200,17 +230,115 @@ class TgExportTxtService:
 
         return matches, limited
 
-    def _resolve_search_paths(self, resolved: Path) -> list[Path]:
+    def _resolve_search_paths(
+        self,
+        resolved: Path,
+        *,
+        start_bound: date | None = None,
+        end_bound: date | None = None,
+    ) -> list[Path]:
         if resolved.is_file():
             if resolved.suffix != ".txt":
                 raise ValueError("Only .txt export files can be searched.")
+            if not self._matches_date_bounds(resolved, start_bound=start_bound, end_bound=end_bound):
+                return []
             return [resolved]
 
         return sorted(
-            (candidate for candidate in resolved.rglob("*.txt") if candidate.is_file()),
+            (
+                candidate
+                for candidate in resolved.rglob("*.txt")
+                if candidate.is_file()
+                and self._matches_date_bounds(candidate, start_bound=start_bound, end_bound=end_bound)
+            ),
             key=self.display_path,
             reverse=True,
         )
+
+    def _parse_date_bounds(
+        self,
+        start_date: str | None,
+        end_date: str | None,
+    ) -> tuple[date | None, date | None]:
+        start_bound = self._parse_optional_date(start_date, field_name="start_date")
+        end_bound = self._parse_optional_date(end_date, field_name="end_date")
+        if start_bound is not None and end_bound is not None and start_bound > end_bound:
+            raise ValueError("start_date must be less than or equal to end_date.")
+        return start_bound, end_bound
+
+    def _parse_optional_date(self, value: str | None, *, field_name: str) -> date | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError(f"{field_name} must not be empty.")
+        try:
+            return date.fromisoformat(normalized)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be in YYYY-MM-DD format.") from exc
+
+    def _matches_date_bounds(
+        self,
+        path: Path,
+        *,
+        start_bound: date | None,
+        end_bound: date | None,
+    ) -> bool:
+        if start_bound is None and end_bound is None:
+            return True
+
+        bucket_range = self._extract_bucket_date_range(path)
+        if bucket_range is None:
+            return False
+
+        bucket_start, bucket_end = bucket_range
+        if start_bound is not None and bucket_end < start_bound:
+            return False
+        return end_bound is None or bucket_start <= end_bound
+
+    def _extract_bucket_date_range(self, path: Path) -> tuple[date, date] | None:
+        match = re.fullmatch(r"(\d{4})-(\d{2})-w([1-5])", path.stem)
+        if match is None:
+            return None
+
+        year = int(match.group(1))
+        month = int(match.group(2))
+        week = int(match.group(3))
+        last_day = calendar.monthrange(year, month)[1]
+        start_day = ((week - 1) * 7) + 1
+        end_day = min(week * 7, last_day)
+        return date(year, month, start_day), date(year, month, end_day)
+
+    def _fuzzy_match_entries[T](
+        self,
+        entries: list[T],
+        query: str,
+        *,
+        key_parts: Callable[[T], tuple[str, ...]],
+    ) -> list[T]:
+        lowered_query = query.casefold()
+        scored_matches: list[tuple[tuple[int, int, int], T]] = []
+
+        for index, entry in enumerate(entries):
+            parts = tuple(part.casefold() for part in key_parts(entry))
+            haystack = " ".join(parts)
+            if not haystack:
+                continue
+
+            substring_score = int(any(lowered_query in part for part in parts))
+            ratio_score = int(difflib.SequenceMatcher(None, lowered_query, haystack).ratio() * 1000)
+            token_score = max(
+                (int(difflib.SequenceMatcher(None, lowered_query, part).ratio() * 1000) for part in parts),
+                default=0,
+            )
+            score = max(ratio_score, token_score)
+            if substring_score == 0 and score < 400:
+                continue
+
+            scored_matches.append(((substring_score, score, -index), entry))
+
+        scored_matches.sort(reverse=True)
+        return [entry for _, entry in scored_matches]
 
     def _build_file_entry(self, path: Path) -> ExportFileEntry:
         return ExportFileEntry(

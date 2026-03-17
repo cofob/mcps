@@ -71,8 +71,9 @@ Highlights:
 
 - `list_export_files` recursively lists `.txt` files below a root-relative export path
 - `list_chats` reads `chat_id<TAB>chat_name` mappings from the top-level `chats.txt`
-- `search_chats` does case-insensitive substring search over exported chat ids and names
+- `search_chats` does fuzzy search over exported chat ids and names
 - `list_topics` reads `topic_id<TAB>topic_name` mappings from `chats/<chat_id>/topics.txt`
+- `search_topics` does fuzzy search over exported topic ids and names for one forum chat
 - `read_export_file` returns a line-range slice from one `.txt` export file
 - `search_exports` uses `rg --json` to search `.txt` exports and returns `path:line:text` matches
 - access is restricted to one configured export root

@@ -48,6 +48,7 @@ def _make_tool_specs(service: TgExportTxtService) -> list[ToolSpec]:
         _tool_spec(chat_tools.list_chats, "list_chats", "read"),
         _tool_spec(chat_tools.search_chats, "search_chats", "read", "search"),
         _tool_spec(topic_tools.list_topics, "list_topics", "read"),
+        _tool_spec(topic_tools.search_topics, "search_topics", "read", "search"),
         _tool_spec(read_tools.read_export_file, "read_export_file", "read"),
         _tool_spec(search_tools.search_exports, "search_exports", "read", "search"),
     ]

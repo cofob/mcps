@@ -28,22 +28,22 @@ class ChatTools:
         return format_chat_list(chats, limited=limited)
 
     async def search_chats(self, query: str, max_results: int = 200) -> str:
-        """Search exported chats by chat id or chat name.
+        """Fuzzy-search exported chats by chat id or chat name.
 
         How it works:
         - Reads chat entries from the top-level ``chats.txt`` mapping file.
-        - Performs a case-insensitive substring match against both ``chat_id`` and
-          ``chat_name``.
+        - Scores both ids and names with fuzzy matching, while still prioritizing direct
+          substring hits.
         - Returns at most ``max_results`` matches.
 
         How to call it:
-        - Pass a non-empty substring that should match part of the id or name.
+        - Pass a non-empty id or name fragment, even if it is incomplete or misspelled.
         - By id: ``search_chats(query="-1001234567890")``
-        - By name: ``search_chats(query="support")``
+        - By name: ``search_chats(query="suport")``
 
         What it returns:
         - A plain-text result list like ``<index>. <chat_id><TAB><chat_name>``.
-        - The header reports the query and the number of matches returned.
+        - The best fuzzy matches are listed first.
         - If more matches exist than returned, the output includes a truncation note.
         """
         chats, limited = self._service.search_chats(query, max_results=max_results)

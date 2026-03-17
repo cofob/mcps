@@ -78,16 +78,19 @@ def test_list_chats_reads_chat_mapping_file(tmp_path: Path) -> None:
     assert [(chat.chat_id, chat.chat_name) for chat in chats] == [("123", "Alice"), ("456", "Bob")]
 
 
-def test_search_chats_filters_by_id_or_name(tmp_path: Path) -> None:
+def test_search_chats_uses_fuzzy_matching(tmp_path: Path) -> None:
     service = make_service(tmp_path)
-    (tmp_path / "chats.txt").write_text("123\tAlice Example\n456\tBob\n", encoding="utf-8")
+    (tmp_path / "chats.txt").write_text("123\tSupport Desk\n456\tBob\n789\tSupplies\n", encoding="utf-8")
 
-    by_name, limited_by_name = service.search_chats("alice", max_results=10)
+    by_name, limited_by_name = service.search_chats("suport", max_results=10)
     by_id, limited_by_id = service.search_chats("456", max_results=10)
 
     assert not limited_by_name
     assert not limited_by_id
-    assert [(chat.chat_id, chat.chat_name) for chat in by_name] == [("123", "Alice Example")]
+    assert [(chat.chat_id, chat.chat_name) for chat in by_name][:2] == [
+        ("123", "Support Desk"),
+        ("789", "Supplies"),
+    ]
     assert [(chat.chat_id, chat.chat_name) for chat in by_id] == [("456", "Bob")]
 
 
@@ -101,6 +104,21 @@ def test_list_topics_reads_per_chat_topic_mapping_file(tmp_path: Path) -> None:
 
     assert not limited
     assert [(topic.topic_id, topic.topic_name) for topic in topics] == [("1", "General"), ("42", "Release notes")]
+
+
+def test_search_topics_uses_fuzzy_matching(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    topic_dir = tmp_path / "chats" / "123"
+    topic_dir.mkdir(parents=True)
+    (topic_dir / "topics.txt").write_text("1\tRelease notes\n2\tGeneral\n3\tRelated work\n", encoding="utf-8")
+
+    topics, limited = service.search_topics("123", "relase", max_results=10)
+
+    assert not limited
+    assert [(topic.topic_id, topic.topic_name) for topic in topics][:2] == [
+        ("1", "Release notes"),
+        ("3", "Related work"),
+    ]
 
 
 def test_search_exports_uses_rg_json_output(tmp_path: Path) -> None:
@@ -210,3 +228,49 @@ def test_search_exports_searches_newest_files_first(tmp_path: Path) -> None:
     assert not limited
     called_command = popen_mock.call_args.args[0]
     assert called_command[-2:] == [str(newer_file), str(older_file)]
+
+
+def test_search_exports_filters_by_date_range(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    chat_dir = tmp_path / "chats" / "123"
+    chat_dir.mkdir(parents=True)
+    older_file = chat_dir / "2026-02-w4.txt"
+    matching_file = chat_dir / "2026-03-w3.txt"
+    newer_file = chat_dir / "2026-04-w1.txt"
+    older_file.write_text("older\n", encoding="utf-8")
+    matching_file.write_text("matching\n", encoding="utf-8")
+    newer_file.write_text("newer\n", encoding="utf-8")
+
+    process = Mock()
+    process.stdout = iter(())
+    process.stderr = Mock(read=Mock(return_value=""))
+    process.wait = Mock(return_value=1)
+    process.poll = Mock(return_value=1)
+
+    with patch("tg_export_txt_mcp.service.subprocess.Popen", return_value=process) as popen_mock:
+        matches, limited = service.search_exports(
+            "chats/123",
+            "match",
+            max_results=10,
+            start_date="2026-03-10",
+            end_date="2026-03-20",
+        )
+
+    assert matches == []
+    assert not limited
+    called_command = popen_mock.call_args.args[0]
+    assert called_command[-1] == str(matching_file)
+
+
+def test_search_exports_rejects_invalid_date_range(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    with pytest.raises(ValueError, match="start_date must be less than or equal to end_date"):
+        service.search_exports(".", "match", start_date="2026-03-20", end_date="2026-03-10")
+
+
+def test_search_exports_rejects_invalid_date_format(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+
+    with pytest.raises(ValueError, match="start_date must be in YYYY-MM-DD format"):
+        service.search_exports(".", "match", start_date="2026/03/10")

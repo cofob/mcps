@@ -6,10 +6,11 @@ It exposes:
 
 - `list_export_files`: recursively list `.txt` files under a root-relative path such as `.` or `chats/-1001234567890`
 - `list_chats`: read exported chat ids and names from the top-level `chats.txt`
-- `search_chats`: case-insensitive substring search over chat ids and chat names from `chats.txt`
+- `search_chats`: fuzzy search over chat ids and chat names from `chats.txt`
 - `list_topics`: read forum topic ids and names from `chats/<chat_id>/topics.txt`
+- `search_topics`: fuzzy search over topic ids and topic names from `chats/<chat_id>/topics.txt`
 - `read_export_file`: read a slice of one `.txt` export file by `path`, `start_line`, and `max_lines`
-- `search_exports`: run `rg` over `.txt` files below one root-relative path and return `path:line:text` matches
+- `search_exports`: run `rg` over `.txt` files below one root-relative path, searching newest buckets first and optionally filtering by `start_date` / `end_date`
 
 Examples:
 
@@ -17,15 +18,18 @@ Examples:
 - `search_chats(query="support")`
 - `list_export_files(path="chats/-1001234567890", max_results=50)`
 - `list_topics(chat_id="-1001234567890")`
+- `search_topics(chat_id="-1001234567890", query="relase")`
 - `read_export_file(path="chats/-1001234567890/2026-03-w3.txt", start_line=1, max_lines=200)`
 - `search_exports(path="chats/-1001234567890", query="refund", max_results=20)`
+- `search_exports(path="chats/-1001234567890", query="refund", start_date="2026-03-01", end_date="2026-03-17")`
 
 Return format:
 
-- `list_chats`, `search_chats`, and `list_topics` return plain-text numbered lists in `id<TAB>name` form.
+- `list_chats`, `search_chats`, `list_topics`, and `search_topics` return plain-text numbered lists in `id<TAB>name` form.
 - `list_export_files` returns a plain-text numbered list of relative file paths with byte sizes.
 - `read_export_file` returns file metadata plus the requested content block.
 - `search_exports` returns a plain-text numbered list of `relative_path:line_number: line_text` matches.
+- `search_exports` accepts ISO `YYYY-MM-DD` `start_date` and `end_date` filters and applies them to weekly files like `2026-03-w3.txt`.
 - Truncated result sets include a note at the end of the response.
 
 The service is exposed over HTTP at `/mcp`.

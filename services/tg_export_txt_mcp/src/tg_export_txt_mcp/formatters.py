@@ -70,3 +70,18 @@ def format_topic_list(chat_id: str, topics: Sequence[ExportTopicEntry], *, limit
     if limited:
         lines.extend(["", "Results were truncated at the configured max_search_results limit."])
     return "\n".join(lines)
+
+
+def format_topic_search_results(
+    chat_id: str,
+    query: str,
+    topics: Sequence[ExportTopicEntry],
+    *,
+    limited: bool,
+) -> str:
+    lines = [f'Search topics in chat {chat_id} for "{query}": {len(topics)} match(es)']
+    for index, topic in enumerate(topics, start=1):
+        lines.append(f"{index}. {topic.topic_id}\t{topic.topic_name}")
+    if limited:
+        lines.extend(["", "Results were truncated at the configured max_search_results limit."])
+    return "\n".join(lines)
