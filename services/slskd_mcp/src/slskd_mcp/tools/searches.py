@@ -28,7 +28,13 @@ class SearchTools:
         minimum_peer_upload_speed: int = 0,
         limit: int = 50,
     ) -> str:
-        """Start a new slskd search, wait for completion, and return readable results."""
+        """Start a slskd music search, wait for completion, and return readable results.
+
+        Guidance: use concise filename-style keywords rather than long phrases.
+        Include only terms likely present in file names (e.g. artist, album, track).
+        Example: "Gesaffelstein enter the gamma"
+        (Gesaffelstein = artist, Enter the Gamma = album).
+        """
         payload = await self._client.request(
             "POST",
             "/api/v0/searches",

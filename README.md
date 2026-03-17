@@ -154,7 +154,7 @@ Exposed tools:
 Tool inputs and outputs:
 
 - `slskd_create_search(search_text: str, response_limit: int = 100, file_limit: int = 10000, search_timeout: int = 15, filter_responses: bool = True, minimum_response_file_count: int = 1, maximum_peer_queue_length: int = 1000000, minimum_peer_upload_speed: int = 0, limit: int = 50) -> str`
-  Input: search text and slskd search tuning parameters.
+  Input: search text and slskd search tuning parameters. For music searches, use minimal filename-like terms (artist + album/title keywords) rather than long natural-language phrases. Example: `Gesaffelstein enter the gamma`.
   Output: waits for search completion and returns a readable flattened file result list.
 - `slskd_list_searches() -> str`
   Input: none.
