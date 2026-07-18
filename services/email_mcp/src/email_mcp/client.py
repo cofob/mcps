@@ -181,6 +181,19 @@ class EmailClient:
         except ValueError as exc:
             raise UpstreamValidationError(str(exc)) from exc
 
+    async def validate_account(self, account_name: str) -> None:
+        """Validate IMAP and SMTP authentication without changing or sending mail."""
+        await asyncio.to_thread(self._validate_account, account_name)
+
+    def _validate_account(self, account_name: str) -> None:
+        account = self._account(account_name)
+        with self._imap(account) as imap_connection:
+            self._select(imap_connection, "INBOX")
+        with self._smtp(account) as smtp_connection:
+            status, _ = smtp_connection.noop()
+            if status != 250:
+                raise UpstreamServerError("SMTP NOOP validation failed.")
+
     @contextmanager
     def _imap(self, account: EmailAccountSettings) -> Iterator[imaplib.IMAP4]:
         connection: imaplib.IMAP4 | None = None
@@ -249,9 +262,7 @@ class EmailClient:
                 continue
             delimiter_raw = match.group("delimiter")
             delimiter = (
-                None
-                if delimiter_raw == b"NIL"
-                else _unquote_imap(delimiter_raw).decode("ascii", errors="replace")
+                None if delimiter_raw == b"NIL" else _unquote_imap(delimiter_raw).decode("ascii", errors="replace")
             )
             folders.append(
                 MailboxFolder(
@@ -401,9 +412,7 @@ class EmailClient:
             disposition = part.get_content_disposition()
             filename = part.get_filename()
             content_id = str(part["Content-ID"]).strip("<>") if part["Content-ID"] is not None else None
-            is_attachment = filename is not None or (
-                disposition in {"attachment", "inline"} and content_id is not None
-            )
+            is_attachment = filename is not None or (disposition in {"attachment", "inline"} and content_id is not None)
             if is_attachment:
                 data = _decoded_part_bytes(part)
                 attachments.append(
@@ -459,6 +468,16 @@ class EmailClient:
 
     def _send_raw(self, account_name: str, raw_message: bytes, recipients: tuple[str, ...]) -> None:
         account = self._account(account_name)
+        with self._smtp(account) as connection:
+            refused = connection.sendmail(account.from_address, list(recipients), raw_message)
+            if refused:
+                refused_addresses = ", ".join(sorted(refused))
+                raise UpstreamValidationError(
+                    f"SMTP refused recipients: {refused_addresses}. Other recipients may have received the message.",
+                )
+
+    @contextmanager
+    def _smtp(self, account: EmailAccountSettings) -> Iterator[smtplib.SMTP]:
         context = ssl.create_default_context()
         connection: smtplib.SMTP | None = None
         try:
@@ -485,12 +504,7 @@ class EmailClient:
                 )
             except smtplib.SMTPAuthenticationError as exc:
                 raise UpstreamAuthError("SMTP authentication failed.") from exc
-            refused = connection.sendmail(account.from_address, list(recipients), raw_message)
-            if refused:
-                refused_addresses = ", ".join(sorted(refused))
-                raise UpstreamValidationError(
-                    f"SMTP refused recipients: {refused_addresses}. Other recipients may have received the message.",
-                )
+            yield connection
         except (UpstreamAuthError, UpstreamValidationError):
             raise
         except (smtplib.SMTPException, OSError, TimeoutError) as exc:

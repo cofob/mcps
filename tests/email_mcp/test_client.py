@@ -1,4 +1,5 @@
 import imaplib
+import smtplib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
@@ -31,6 +32,31 @@ def make_client() -> EmailClient:
 @contextmanager
 def mocked_imap(connection: imaplib.IMAP4) -> Iterator[imaplib.IMAP4]:
     yield connection
+
+
+@contextmanager
+def mocked_smtp(connection: smtplib.SMTP) -> Iterator[smtplib.SMTP]:
+    yield connection
+
+
+def test_validate_account_checks_readonly_inbox_and_smtp_noop_without_sending() -> None:
+    client = make_client()
+    imap_mock = Mock(spec=imaplib.IMAP4)
+    imap_mock.select.return_value = ("OK", [b"1"])
+    smtp_mock = Mock(spec=smtplib.SMTP)
+    smtp_mock.noop.return_value = (250, b"OK")
+    imap_connection = cast(imaplib.IMAP4, imap_mock)
+    smtp_connection = cast(smtplib.SMTP, smtp_mock)
+
+    with (
+        patch.object(client, "_imap", side_effect=lambda _: mocked_imap(imap_connection)),
+        patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)),
+    ):
+        client._validate_account("work")
+
+    imap_mock.select.assert_called_once_with('"INBOX"', readonly=True)
+    smtp_mock.noop.assert_called_once_with()
+    smtp_mock.sendmail.assert_not_called()
 
 
 def test_list_messages_selects_readonly_and_fetches_peek_headers() -> None:

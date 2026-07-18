@@ -36,7 +36,7 @@ uv sync --all-packages --group dev
 uv run ruff check .
 
 # Type-check
-uv run mypy packages services tests
+uv run mypy packages services tests src
 
 # Run tests
 uv run pytest
@@ -77,6 +77,7 @@ docker build -f docker/tg-export-txt.Dockerfile .
 ### Workspace Layout
 
 - `packages/mcp_common`: shared infrastructure
+- `src/mcps_workspace`: direct-Git launchers, interactive installer, named profiles, secrets, and agent adapters
 - `services/email_mcp`: email MCP server
 - `services/navidrome_mcp`: Navidrome MCP server
 - `services/slskd_mcp`: slskd MCP server
@@ -85,6 +86,16 @@ docker build -f docker/tg-export-txt.Dockerfile .
 - `tests`: shared and service-specific tests
 - `docker`: per-service Dockerfiles
 - `.github/workflows/ci.yml`: lint, type-check, test, and image publishing workflow
+
+### Interactive Installer
+
+- Root script `install` runs the user-wide interactive setup flow.
+- Root script `mcps-run <service> --profile <name>` resolves stored settings and secrets before starting stdio.
+- Agent configuration must never contain service credentials; use the system keyring or explicit restricted-file store.
+- Installer validation must be read-only: Email uses IMAP read-only selection and SMTP `NOOP`, Navidrome uses Subsonic
+  `ping`, and slskd uses `GET /api/v0/application`.
+- Agent registration is adapter-based and must preserve unrelated configuration, back up replaced files, and roll back
+  the current registration on failure.
 
 ### Service Pattern
 
@@ -250,7 +261,7 @@ For any non-trivial change, run:
 
 ```bash
 uv run ruff check .
-uv run mypy packages services tests
+uv run mypy packages services tests src
 uv run pytest
 ```
 

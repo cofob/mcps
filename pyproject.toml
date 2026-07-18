@@ -5,12 +5,17 @@ requires-python = ">=3.12"
 dependencies = [
   "email-mcp",
   "filesystem-mcp",
+  "keyring>=25.6.0",
   "navidrome-mcp",
+  "platformdirs>=4.3.0",
+  "questionary>=2.1.0",
   "slskd-mcp",
   "tg-export-txt-mcp",
 ]
 
 [project.scripts]
+install = "mcps_workspace.installer:main"
+mcps-run = "mcps_workspace.runner:main"
 mcps-email = "email_mcp.__main__:main"
 mcps-filesystem = "filesystem_mcp.__main__:main"
 mcps-navidrome = "navidrome_mcp.__main__:main"

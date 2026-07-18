@@ -21,6 +21,15 @@ For maximum portability across IMAP servers, textual search filters currently ac
 
 ## Account Configuration
 
+The recommended local setup is the interactive installer, which offers provider presets, masked credential prompts,
+system-keyring storage, and non-sending IMAP/SMTP validation:
+
+```bash
+uvx --from 'git+https://github.com/cofob/mcps.git' install
+```
+
+The manual environment format remains available for containers and custom deployments.
+
 Set `EMAIL_ACCOUNTS` to a JSON object. Passwords are represented as Pydantic secrets and are never included in account
 list output or logs.
 

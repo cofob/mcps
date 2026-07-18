@@ -139,9 +139,53 @@ Quality checks:
 
 ```bash
 uv run ruff check .
-uv run mypy packages services tests
+uv run mypy packages services tests src
 uv run pytest
 ```
+
+## Interactive Installation
+
+Install one or more services into supported local coding agents without publishing anything to PyPI:
+
+```bash
+uvx --from 'git+https://github.com/cofob/mcps.git' install
+```
+
+The wizard:
+
+- detects Codex, Claude Code, OpenCode, and Gemini CLI and lets you select multiple installed agents
+- configures named profiles for Email, Filesystem, Navidrome, slskd, and Telegram TXT export
+- validates remote credentials and local paths before writing configuration
+- stores passwords and API keys in the system keyring, with an explicit restricted-file fallback
+- performs an MCP stdio initialization and tool-discovery smoke test
+- previews every profile and asks before replacing existing profile or agent entries
+
+Installed agent entries contain no credentials. They invoke a named profile through the Git checkout's generic runner:
+
+```text
+uvx --from git+https://github.com/cofob/mcps.git mcps-run email --profile personal
+```
+
+Profiles use the platform user-configuration directory returned by `platformdirs`. Non-secret settings live in
+`config.json`. Keyring credentials use the `cofob.mcps` service name. When restricted-file storage is explicitly
+selected, secrets live in `secrets.json`; the installer creates the directory with user-only permissions and uses mode
+`0600` on POSIX systems.
+
+Re-run `install` to add another named profile or update an existing one. Existing agent configuration is backed up with
+an `.mcps-backup-<timestamp>` suffix before replacement. Use these options for troubleshooting or automation:
+
+```bash
+# Deliberately use the restricted local secrets file
+uvx --from 'git+https://github.com/cofob/mcps.git' install --secret-store file
+
+# Configure without network or credential checks; the profile is marked unverified
+uvx --from 'git+https://github.com/cofob/mcps.git' install --skip-validation
+```
+
+Email setup includes Gmail, Outlook.com, iCloud Mail, and Fastmail presets plus custom verified-TLS IMAP/SMTP settings.
+Validation logs in to IMAP, selects `INBOX` read-only, authenticates to SMTP, and runs `NOOP`; it never sends a test
+message. Gmail, iCloud, and Fastmail commonly require app-specific passwords. Outlook.com normally requires
+OAuth2/Modern Auth, which is not supported by the password/app-password email service and may fail validation.
 
 ## Direct Git Usage With uv
 

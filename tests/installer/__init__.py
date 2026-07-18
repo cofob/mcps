@@ -1,0 +1,1 @@
+"""Interactive installer tests."""
