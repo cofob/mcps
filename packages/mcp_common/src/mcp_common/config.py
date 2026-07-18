@@ -1,7 +1,14 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mcp_common.auth import AuthMode, OAuth2Settings
+
+
+class TransportMode(StrEnum):
+    STDIO = "stdio"
+    HTTP = "http"
 
 
 class ToolSettings(BaseModel):
@@ -17,6 +24,7 @@ class BaseServiceSettings(BaseSettings):
     port: int = Field(default=8080, alias="PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     timeout_seconds: float = Field(default=20.0, alias="TIMEOUT_SECONDS")
+    mcp_transport: TransportMode = Field(default=TransportMode.STDIO, alias="MCP_TRANSPORT")
     mcp_auth_mode: AuthMode = Field(default=AuthMode.NONE, alias="MCP_AUTH_MODE")
     oauth2: OAuth2Settings | None = None
     tools: ToolSettings = Field(default_factory=ToolSettings)

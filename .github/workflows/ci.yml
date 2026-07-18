@@ -24,6 +24,9 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Install GPG
+        run: sudo apt-get update && sudo apt-get install --yes gnupg
+
       - name: Sync dependencies
         run: uv sync --all-packages --group dev
 
@@ -31,10 +34,12 @@ jobs:
         run: uv run ruff check .
 
       - name: Mypy
-        run: uv run mypy packages services
+        run: uv run mypy packages services tests
 
       - name: Pytest
         run: uv run pytest
+        env:
+          RUN_GPG_INTEGRATION: "1"
 
   docker:
     runs-on: ubuntu-latest
@@ -45,6 +50,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - image: ghcr.io/cofob/email-mcp
+            dockerfile: docker/email.Dockerfile
           - image: ghcr.io/cofob/filesystem-mcp
             dockerfile: docker/filesystem.Dockerfile
           - image: ghcr.io/cofob/navidrome-mcp

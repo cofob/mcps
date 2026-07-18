@@ -11,21 +11,25 @@ COPY packages ./packages
 COPY services ./services
 COPY src ./src
 
-RUN uv sync --frozen --no-dev --package slskd-mcp
+RUN uv sync --frozen --no-dev --package email-mcp
 
 FROM python:3.12-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends gnupg \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /app /app
 
 RUN useradd --create-home --home-dir /home/appuser --shell /usr/sbin/nologin --uid 10001 appuser \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app /home/appuser
 
 ENV HOST=0.0.0.0
-ENV PORT=8081
+ENV PORT=8084
 
-EXPOSE 8081
+EXPOSE 8084
 
 USER appuser
 
-CMD ["/app/.venv/bin/slskd-mcp", "--transport", "http"]
+CMD ["/app/.venv/bin/email-mcp", "--transport", "http"]

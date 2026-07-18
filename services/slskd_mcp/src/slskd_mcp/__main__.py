@@ -1,9 +1,7 @@
-import uvicorn
-
-from slskd_mcp.app import create_app
+from mcp_common import run_service
+from slskd_mcp.app import create_app, create_mcp
 from slskd_mcp.config import SlskdSettings
 
 
 def main() -> None:
-    settings = SlskdSettings.from_env()
-    uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    run_service(SlskdSettings.from_env, create_mcp, create_app)

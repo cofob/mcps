@@ -4,6 +4,7 @@ requires-python = ">=3.12"
 
 [manifest]
 members = [
+    "email-mcp",
     "filesystem-mcp",
     "mcp-common",
     "mcps-workspace",
@@ -286,6 +287,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ae/b6/03bb70946330e88ffec97aefd3ea75ba575cb2e762061e0e62a213befee8/docutils-0.22.4.tar.gz", hash = "sha256:4db53b1fde9abecbb74d91230d32ab626d94f6badfc575d6db9194a49df29968", size = 2291750, upload-time = "2025-12-18T19:00:26.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl", hash = "sha256:d0013f540772d1420576855455d050a2180186c91c15779301ac2ccb3eeb68de", size = 633196, upload-time = "2025-12-18T19:00:18.077Z" },
+]
+
+[[package]]
+name = "email-mcp"
+version = "0.1.0"
+source = { editable = "services/email_mcp" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "mcp-common" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=3.1.1" },
+    { name = "mcp-common", editable = "packages/mcp_common" },
+    { name = "pydantic", specifier = ">=2.11.0" },
+    { name = "pydantic-settings", specifier = ">=2.8.0" },
+    { name = "starlette", specifier = ">=0.46.0" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
 [[package]]
@@ -655,26 +679,37 @@ name = "mcp-common"
 version = "0.1.0"
 source = { editable = "packages/mcp_common" }
 dependencies = [
+    { name = "fastmcp" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "starlette" },
     { name = "typing-extensions" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "fastmcp", specifier = ">=3.1.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pydantic-settings", specifier = ">=2.8.0" },
     { name = "starlette", specifier = ">=0.46.0" },
     { name = "typing-extensions", specifier = ">=4.12.0" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
 [[package]]
 name = "mcps-workspace"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
+dependencies = [
+    { name = "email-mcp" },
+    { name = "filesystem-mcp" },
+    { name = "navidrome-mcp" },
+    { name = "slskd-mcp" },
+    { name = "tg-export-txt-mcp" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -687,6 +722,13 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "email-mcp", editable = "services/email_mcp" },
+    { name = "filesystem-mcp", editable = "services/filesystem_mcp" },
+    { name = "navidrome-mcp", editable = "services/navidrome_mcp" },
+    { name = "slskd-mcp", editable = "services/slskd_mcp" },
+    { name = "tg-export-txt-mcp", editable = "services/tg_export_txt_mcp" },
+]
 
 [package.metadata.requires-dev]
 dev = [

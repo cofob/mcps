@@ -1,8 +1,9 @@
 # MCP Servers
 
-This repository contains four HTTP MCP servers implemented in Python 3.12+ with `uv`, `FastMCP`, `ruff`, `mypy`, and `pytest`.
+This repository contains five MCP servers implemented in Python 3.12+ with `uv`, `FastMCP`, `ruff`, `mypy`, and `pytest`.
 
-Each service exposes:
+Every command uses stdio by default for direct MCP client integration. Pass `--transport http` (or set
+`MCP_TRANSPORT=http`) to expose:
 
 - `POST /mcp` for the MCP transport
 - `GET /healthz` for a basic health check
@@ -10,6 +11,23 @@ Each service exposes:
 Repository: `cofob/mcps`
 
 ## Services
+
+### `email-mcp`
+
+IMAP/SMTP email MCP server for multiple named accounts.
+
+Highlights:
+
+- list folders and list, search, or read messages without changing read state
+- fetch complete attachments as MCP binary resources
+- send plain-text/HTML messages with bounded base64 attachment inputs
+- sign outgoing MIME bodies and attachments with OpenPGP/MIME through a configured GPG keyring and agent
+
+Package: [services/email_mcp](/Users/cofob/Development/mcps/services/email_mcp)
+
+Published image:
+
+- `ghcr.io/cofob/email-mcp`
 
 ### `filesystem-mcp`
 
@@ -91,6 +109,7 @@ Published image:
 packages/
   mcp_common/
 services/
+  email_mcp/
   filesystem_mcp/
   navidrome_mcp/
   slskd_mcp/
@@ -124,9 +143,46 @@ uv run mypy packages services tests
 uv run pytest
 ```
 
+## Direct Git Usage With uv
+
+The installable workspace root exposes one launcher per service without publishing any package to PyPI. Pin a tag or
+commit in production MCP client configuration:
+
+```bash
+uvx --from 'git+https://github.com/cofob/mcps.git@<tag-or-commit>' mcps-email
+uvx --from 'git+https://github.com/cofob/mcps.git@<tag-or-commit>' mcps-filesystem
+uvx --from 'git+https://github.com/cofob/mcps.git@<tag-or-commit>' mcps-navidrome
+uvx --from 'git+https://github.com/cofob/mcps.git@<tag-or-commit>' mcps-slskd
+uvx --from 'git+https://github.com/cofob/mcps.git@<tag-or-commit>' mcps-tg-export-txt
+```
+
+Example MCP client entry using stdio:
+
+```json
+{
+  "command": "uvx",
+  "args": ["--from", "git+https://github.com/cofob/mcps.git@<tag-or-commit>", "mcps-email"],
+  "env": {
+    "EMAIL_ACCOUNTS": "{\"personal\":{\"imap_host\":\"imap.example.com\",\"smtp_host\":\"smtp.example.com\",\"username\":\"alice@example.com\",\"password\":\"app-password\",\"from_address\":\"alice@example.com\"}}"
+  }
+}
+```
+
 ## Running Locally
 
-Run services from the workspace root.
+Run services from the workspace root. The examples below select HTTP explicitly; omit `--transport http` for stdio.
+
+### Email
+
+```bash
+export EMAIL_ACCOUNTS='{"personal":{"imap_host":"imap.example.com","smtp_host":"smtp.example.com","username":"alice@example.com","password":"app-password","from_address":"alice@example.com","from_name":"Alice"}}'
+export HOST="0.0.0.0"
+export PORT="8084"
+
+uv run --package email-mcp email-mcp --transport http
+```
+
+See [the email service README](/Users/cofob/Development/mcps/services/email_mcp) for attachments, limits, and GPG setup.
 
 ### Navidrome
 
@@ -137,7 +193,7 @@ export NAVIDROME_PASSWORD="secret"
 export HOST="0.0.0.0"
 export PORT="8080"
 
-uv run --package navidrome-mcp navidrome-mcp
+uv run --package navidrome-mcp navidrome-mcp --transport http
 ```
 
 ### slskd
@@ -150,7 +206,7 @@ export SLSKD_API_KEY="your-api-key"
 export HOST="0.0.0.0"
 export PORT="8081"
 
-uv run --package slskd-mcp slskd-mcp
+uv run --package slskd-mcp slskd-mcp --transport http
 ```
 
 Username/password mode:
@@ -162,7 +218,7 @@ export SLSKD_PASSWORD="secret"
 export HOST="0.0.0.0"
 export PORT="8081"
 
-uv run --package slskd-mcp slskd-mcp
+uv run --package slskd-mcp slskd-mcp --transport http
 ```
 
 ### Filesystem
@@ -172,7 +228,7 @@ export FILESYSTEM_ROOT_DIR="/srv/data"
 export HOST="0.0.0.0"
 export PORT="8082"
 
-uv run --package filesystem-mcp filesystem-mcp
+uv run --package filesystem-mcp filesystem-mcp --transport http
 ```
 
 ### tg-export-txt
@@ -185,7 +241,7 @@ export TG_EXPORT_TXT_MAX_SEARCH_RESULTS="200"
 export HOST="0.0.0.0"
 export PORT="8083"
 
-uv run --package tg-export-txt-mcp tg-export-txt-mcp
+uv run --package tg-export-txt-mcp tg-export-txt-mcp --transport http
 ```
 
 ## Common Configuration
@@ -196,6 +252,7 @@ All services share these environment variables through [mcp_common](/Users/cofob
 - `PORT`
 - `LOG_LEVEL`
 - `TIMEOUT_SECONDS`
+- `MCP_TRANSPORT`
 - `MCP_AUTH_MODE`
 
 Defaults:
@@ -204,6 +261,7 @@ Defaults:
 - `PORT=8080`
 - `LOG_LEVEL=INFO`
 - `TIMEOUT_SECONDS=20.0`
+- `MCP_TRANSPORT=stdio`
 - `MCP_AUTH_MODE=none`
 
 Tool gating is also shared across services via the nested `TOOLS` settings object.
@@ -227,6 +285,7 @@ Current CI in [ci.yml](/Users/cofob/Development/mcps/.github/workflows/ci.yml):
 
 Docker images currently built by CI:
 
+- `ghcr.io/cofob/email-mcp`
 - `ghcr.io/cofob/filesystem-mcp`
 - `ghcr.io/cofob/navidrome-mcp`
 - `ghcr.io/cofob/slskd-mcp`
@@ -234,7 +293,7 @@ Docker images currently built by CI:
 
 ## HTTP Endpoints
 
-Every service exposes:
+When started with `--transport http`, every service exposes:
 
 - `GET /healthz`
 - `POST /mcp`

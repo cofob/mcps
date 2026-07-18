@@ -26,7 +26,7 @@ def test_run_cli_executes_command_via_bash(tmp_path: Path) -> None:
     assert result.stdout == "hello\n"
     assert result.cwd == "."
     run_mock.assert_called_once()
-    assert run_mock.call_args.args[0] == ["bash", "-lc", "cat chats.txt"]
+    assert run_mock.call_args.args[0] == ["/bin/bash", "-lc", "cat chats.txt"]
 
 
 def test_run_cli_allows_shell_operators(tmp_path: Path) -> None:
@@ -40,7 +40,7 @@ def test_run_cli_allows_shell_operators(tmp_path: Path) -> None:
         result = service.run_cli("rg foo chats | head")
 
     assert result.exit_code == 0
-    assert run_mock.call_args.args[0] == ["bash", "-lc", "rg foo chats | head"]
+    assert run_mock.call_args.args[0] == ["/bin/bash", "-lc", "rg foo chats | head"]
 
 
 @pytest.mark.asyncio

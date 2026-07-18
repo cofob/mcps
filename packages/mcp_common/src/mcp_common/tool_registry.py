@@ -3,22 +3,24 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
-from mcp.types import ToolAnnotations
+from mcp.types import EmbeddedResource, ToolAnnotations
 
 from mcp_common.config import ToolSettings
 
 logger = logging.getLogger(__name__)
 
+ToolResult = str | EmbeddedResource
+
 
 class SupportsToolRegistration(Protocol):
     def tool(
         self,
-        name_or_fn: Callable[..., Awaitable[str]],
+        name_or_fn: Callable[..., Awaitable[ToolResult]],
         *,
         name: str,
         tags: set[str] | None = None,
         annotations: ToolAnnotations | None = None,
-    ) -> Callable[..., Awaitable[str]]: ...
+    ) -> Callable[..., Awaitable[ToolResult]]: ...
 
 
 @dataclass(frozen=True)
@@ -42,7 +44,7 @@ def build_tool_tags(name: str, groups: frozenset[str]) -> frozenset[str]:
         tags.add("open-world")
     if "closed-world" in groups:
         tags.add("closed-world")
-    if name.startswith(("navidrome_", "slskd_")):
+    if name.startswith(("email_", "navidrome_", "slskd_")):
         tags.add("remote-service")
         tags.add("open-world")
     elif name in {
@@ -77,7 +79,7 @@ def build_tool_annotations(name: str, groups: frozenset[str]) -> ToolAnnotations
         "slskd_cancel_download",
         "slskd_clear_completed_downloads",
     }
-    open_world = "open-world" in groups or name.startswith(("navidrome_", "slskd_"))
+    open_world = "open-world" in groups or name.startswith(("email_", "navidrome_", "slskd_"))
     idempotent = read_only or name in {
         "create_directory",
         "write_file",

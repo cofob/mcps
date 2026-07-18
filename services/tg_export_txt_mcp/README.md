@@ -38,7 +38,7 @@ Return format:
 - `search_exports` accepts ISO `YYYY-MM-DD` `start_date` and `end_date` filters and applies them to weekly files like `2026-03-w3.txt`.
 - Truncated result sets include a note at the end of the response.
 
-The service is exposed over HTTP at `/mcp`.
+The command defaults to stdio; `--transport http` exposes `/mcp` and `/healthz`.
 
 Container note:
 

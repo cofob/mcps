@@ -1,9 +1,7 @@
-import uvicorn
-
-from navidrome_mcp.app import create_app
+from mcp_common import run_service
+from navidrome_mcp.app import create_app, create_mcp
 from navidrome_mcp.config import NavidromeSettings
 
 
 def main() -> None:
-    settings = NavidromeSettings.from_env()
-    uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    run_service(NavidromeSettings.from_env, create_mcp, create_app)

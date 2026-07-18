@@ -2,21 +2,23 @@
 
 ## Project Overview
 
-This repository contains a small Python 3.12+ MCP monorepo built around HTTP-first MCP servers using `FastMCP`.
+This repository contains a small Python 3.12+ MCP monorepo using `FastMCP` with stdio and HTTP transports.
 
 Current services:
 
+- `email-mcp`: multi-account IMAP/SMTP MCP server with MIME attachments and OpenPGP/MIME sending
 - `filesystem-mcp`: local filesystem MCP server rooted to one configured directory
 - `navidrome-mcp`: Navidrome/Subsonic MCP server
 - `slskd-mcp`: slskd REST MCP server
+- `tg-export-txt-mcp`: read-only Telegram TXT export MCP server
 - `mcp-common`: shared auth, config, HTTP, typing, formatting, and tool-registration helpers
 
-All services are exposed over HTTP:
+Commands default to stdio. HTTP mode is selected with `--transport http` or `MCP_TRANSPORT=http` and exposes:
 
 - MCP transport at `/mcp`
 - health endpoint at `/healthz`
 
-The repository publishes Docker images to `ghcr.io/cofob/mcps/<service>`.
+The repository publishes Docker images to `ghcr.io/cofob/<service>`.
 
 ## Essential Commands
 
@@ -43,6 +45,9 @@ uv run pytest
 ### Running Services
 
 ```bash
+# Email MCP
+uv run --package email-mcp email-mcp
+
 # Navidrome MCP
 uv run --package navidrome-mcp navidrome-mcp
 
@@ -51,6 +56,9 @@ uv run --package slskd-mcp slskd-mcp
 
 # Filesystem MCP
 uv run --package filesystem-mcp filesystem-mcp
+
+# Telegram TXT export MCP
+uv run --package tg-export-txt-mcp tg-export-txt-mcp
 ```
 
 ### Docker
@@ -60,6 +68,8 @@ uv run --package filesystem-mcp filesystem-mcp
 docker build -f docker/navidrome.Dockerfile .
 docker build -f docker/slskd.Dockerfile .
 docker build -f docker/filesystem.Dockerfile .
+docker build -f docker/email.Dockerfile .
+docker build -f docker/tg-export-txt.Dockerfile .
 ```
 
 ## Architecture
@@ -67,9 +77,11 @@ docker build -f docker/filesystem.Dockerfile .
 ### Workspace Layout
 
 - `packages/mcp_common`: shared infrastructure
+- `services/email_mcp`: email MCP server
 - `services/navidrome_mcp`: Navidrome MCP server
 - `services/slskd_mcp`: slskd MCP server
 - `services/filesystem_mcp`: filesystem MCP server
+- `services/tg_export_txt_mcp`: Telegram TXT export MCP server
 - `tests`: shared and service-specific tests
 - `docker`: per-service Dockerfiles
 - `.github/workflows/ci.yml`: lint, type-check, test, and image publishing workflow
@@ -84,6 +96,7 @@ Each service follows the same structure:
 - client or service layer:
   - remote API services use a typed client (`NavidromeClient`, `SlskdClient`)
   - local filesystem logic lives in `FilesystemService`
+  - IMAP/SMTP, MIME, and signing logic lives in the email client/service layer
 - `tools/`: MCP tool methods grouped by workflow
 - `formatters.py`: LLM-readable string output
 - `models.py`: typed data models
@@ -97,14 +110,15 @@ Each service follows the same structure:
 - `http.py`: async `httpx` helpers and upstream error mapping
 - `json_utils.py`: typed JSON helpers and `TypeGuard`-based narrowing
 - `mcp_http.py`: Starlette wrapper that mounts the MCP app and `/healthz`
+- `runtime.py`: shared stdio/HTTP CLI runner
 - `tool_registry.py`: config-driven MCP tool enable/disable logic
 - `types.py`: shared JSON and query param typing
 
 ## Key Patterns
 
-### 1. HTTP-first MCP
+### 1. stdio and HTTP MCP
 
-This repository is not stdio-first. Services are intended to be deployed as HTTP MCP servers.
+Service commands default to stdio for local MCP clients. Docker images select HTTP explicitly.
 
 Expected contract:
 
@@ -182,6 +196,14 @@ Current supported mode:
 OAuth is an HTTP transport concern here. Do not bolt it on as unrelated middleware without confirming it still works with the FastMCP app lifecycle.
 
 ## Service-specific Notes
+
+### Email
+
+- Supports multiple named accounts through `EMAIL_ACCOUNTS`; every mail-accessing tool takes an account name.
+- IMAP reads must select mailboxes read-only and use PEEK so tools never mark messages read.
+- SMTP sends are explicit, non-idempotent mutations; never retry after submission may have started.
+- Attachment payloads are bounded and use MCP blobs for reads or validated base64 for sends.
+- OpenPGP/MIME uses a full fingerprint and external GPG keyring/agent; signing errors must abort before SMTP.
 
 ### Navidrome
 

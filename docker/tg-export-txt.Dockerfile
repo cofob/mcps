@@ -6,10 +6,12 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 COPY pyproject.toml ./
+COPY uv.lock ./
 COPY packages ./packages
-COPY services/tg_export_txt_mcp ./services/tg_export_txt_mcp
+COPY services ./services
+COPY src ./src
 
-RUN uv sync --package tg-export-txt-mcp
+RUN uv sync --frozen --no-dev --package tg-export-txt-mcp
 
 FROM python:3.12-slim AS runtime
 
@@ -36,4 +38,4 @@ EXPOSE 8085
 
 USER appuser
 
-CMD ["/app/.venv/bin/tg-export-txt-mcp"]
+CMD ["/app/.venv/bin/tg-export-txt-mcp", "--transport", "http"]

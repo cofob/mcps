@@ -6,10 +6,12 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 COPY pyproject.toml ./
+COPY uv.lock ./
 COPY packages ./packages
-COPY services/navidrome_mcp ./services/navidrome_mcp
+COPY services ./services
+COPY src ./src
 
-RUN uv sync --package navidrome-mcp
+RUN uv sync --frozen --no-dev --package navidrome-mcp
 
 FROM python:3.12-slim AS runtime
 
@@ -26,4 +28,4 @@ EXPOSE 8080
 
 USER appuser
 
-CMD ["/app/.venv/bin/navidrome-mcp"]
+CMD ["/app/.venv/bin/navidrome-mcp", "--transport", "http"]

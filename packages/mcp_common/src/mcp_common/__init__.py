@@ -1,5 +1,5 @@
 from mcp_common.auth import AuthMode, OAuth2Settings, build_auth_provider
-from mcp_common.config import BaseServiceSettings, ToolSettings
+from mcp_common.config import BaseServiceSettings, ToolSettings, TransportMode
 from mcp_common.errors import (
     UpstreamAuthError,
     UpstreamNotFoundError,
@@ -23,8 +23,10 @@ from mcp_common.json_utils import (
     is_json_string,
 )
 from mcp_common.mcp_http import build_http_app
+from mcp_common.runtime import run_service
 from mcp_common.tool_registry import (
     SupportsToolRegistration,
+    ToolResult,
     ToolSpec,
     build_tool_annotations,
     build_tool_tags,
@@ -42,8 +44,10 @@ __all__ = [
     "JsonValue",
     "OAuth2Settings",
     "SupportsToolRegistration",
+    "ToolResult",
     "ToolSettings",
     "ToolSpec",
+    "TransportMode",
     "UpstreamAuthError",
     "UpstreamNotFoundError",
     "UpstreamRateLimitError",
@@ -68,5 +72,6 @@ __all__ = [
     "is_json_string",
     "register_enabled_tools",
     "request_json",
+    "run_service",
     "should_enable_tool",
 ]

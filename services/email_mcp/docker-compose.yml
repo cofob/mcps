@@ -1,0 +1,10 @@
+services:
+  email-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/email.Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      EMAIL_ACCOUNTS: >-
+        {"personal":{"imap_host":"imap.example.com","smtp_host":"smtp.example.com","username":"alice@example.com","password":"app-password","from_address":"alice@example.com"}}

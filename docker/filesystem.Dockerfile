@@ -6,10 +6,12 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 COPY pyproject.toml ./
+COPY uv.lock ./
 COPY packages ./packages
-COPY services/filesystem_mcp ./services/filesystem_mcp
+COPY services ./services
+COPY src ./src
 
-RUN uv sync --package filesystem-mcp
+RUN uv sync --frozen --no-dev --package filesystem-mcp
 
 FROM python:3.12-slim AS runtime
 
@@ -26,4 +28,4 @@ EXPOSE 8082
 
 USER appuser
 
-CMD ["/app/.venv/bin/filesystem-mcp"]
+CMD ["/app/.venv/bin/filesystem-mcp", "--transport", "http"]
