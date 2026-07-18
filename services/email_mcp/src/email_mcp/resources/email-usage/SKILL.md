@@ -44,20 +44,24 @@ to read message content or the requested task requires that identified message.
 `email_send_message` performs an immediate SMTP submission. Before every call:
 
 1. Build the complete final draft.
-2. Show the exact From account, To/Cc/Bcc recipients, subject, complete plain-text body, complete HTML body when present,
-   attachment filenames and dispositions, and whether signing is enabled.
+2. Show the exact account, resolved From address, To/Cc/Bcc recipients, subject, complete plain-text body, complete HTML
+   body when present, attachment filenames and dispositions, and whether signing is enabled.
 3. Ask the user to explicitly confirm that exact draft.
 4. Call `email_send_message` only after the user confirms in a subsequent response.
 
 An earlier instruction such as “send an email” does not confirm the final draft. Confirmation is single-use. Any change
-to recipients, subject, bodies, attachments, reply-to, account, or signing invalidates it and requires a new complete
-preview and confirmation. Never send a blank or placeholder body unless the confirmed preview shows it explicitly.
+to recipients, subject, bodies, attachments, reply-to, account, From address, or signing invalidates it and requires a
+new complete preview and confirmation. Never send a blank or placeholder body unless the confirmed preview shows it
+explicitly.
 
 SMTP sending is non-idempotent. Never automatically retry a failed send after submission may have begun. If the result
 is ambiguous, explain that delivery may have occurred and let the user verify externally.
 
 ## Bodies and recipients
 
+- Omit `from_address` to use the account's configured `default_from_address`. Supply one validated bare email address
+  to override it for a single message. The resolved address is used for both the MIME `From` header and SMTP envelope.
+- A provider may reject an override that is not an authorized sender identity for the authenticated SMTP account.
 - `text_body` is required and is the accessible fallback even when `html_body` is provided.
 - Preserve the user's intended wording. Do not silently add claims, commitments, recipients, or signatures.
 - Bcc recipients are used for SMTP delivery but are intentionally omitted from the serialized message headers.

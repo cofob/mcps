@@ -30,7 +30,7 @@ async def test_email_validation_checks_imap_and_smtp_without_sending(
             "smtp_host": "smtp.example.com",
             "username": "alice@example.com",
             "password": "secret",
-            "from_address": "alice@example.com",
+            "default_from_address": "alice@example.com",
         }
     }
     collected = CollectedProfile(

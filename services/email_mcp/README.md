@@ -14,7 +14,8 @@ downloading attachments never mark messages as read.
 - `email_search_messages`: combine sender, recipient, subject, text, date, and unread filters
 - `email_get_message`: read normalized headers, text body, and attachment metadata by folder-scoped UID
 - `email_get_attachment`: return one indexed attachment as an MCP binary `EmbeddedResource`
-- `email_send_message`: send text/HTML email with attachments and optional OpenPGP/MIME signing
+- `email_send_message`: send text/HTML email from the configured default or a per-message From address, with attachments
+  and optional OpenPGP/MIME signing
 
 Every tool that accesses mail requires an explicit `account` name.
 For maximum portability across IMAP servers, textual search filters currently accept ASCII text.
@@ -27,8 +28,9 @@ attachments, SMTP failure handling, and OpenPGP/MIME signing.
 
 - Agents may call account, folder, or message list tools and `email_search_messages` only when the user directly asks
   to list, browse, search, find, or check mail or mail configuration. They must not inspect mail proactively.
-- Before every `email_send_message` call, the agent must show the exact account, recipients, subject, complete text and
-  HTML bodies, attachment names, and resolved signing choice, then obtain explicit confirmation in a subsequent turn.
+- Before every `email_send_message` call, the agent must show the exact account, resolved From address, recipients,
+  subject, complete text and HTML bodies, attachment names, and resolved signing choice, then obtain explicit
+  confirmation in a subsequent turn.
 - Confirmation applies to one exact message. Any change requires a new complete preview and confirmation.
 - Because SMTP submission is non-idempotent, agents must not automatically retry a send whose delivery status may be
   ambiguous.
@@ -60,7 +62,7 @@ export EMAIL_ACCOUNTS='{
     "password": "app-password",
     "smtp_username": "optional-separate-relay-user",
     "smtp_password": "optional-separate-relay-password",
-    "from_address": "alice@example.com",
+    "default_from_address": "alice@example.com",
     "from_name": "Alice",
     "gpg_key_fingerprint": "0123456789ABCDEF0123456789ABCDEF01234567",
     "gpg_home": "/home/alice/.gnupg"
@@ -69,7 +71,10 @@ export EMAIL_ACCOUNTS='{
 ```
 
 `smtp_username` and `smtp_password` must either both be present or both be omitted. When omitted, SMTP uses the shared
-username/password. Plaintext protocol connections and disabled certificate verification are not supported.
+username/password. `default_from_address` is used when `email_send_message.from_address` is omitted; the legacy
+`from_address` configuration key remains accepted. A per-message override is applied to both the MIME `From` header and
+SMTP envelope sender, and the SMTP provider may reject identities that are not authorized for the account. Plaintext
+protocol connections and disabled certificate verification are not supported.
 
 ## Attachments
 

@@ -15,11 +15,12 @@ class SendTools:
         cc: list[str] | None = None,
         bcc: list[str] | None = None,
         html_body: str | None = None,
+        from_address: str | None = None,
         reply_to: str | None = None,
         attachments: list[OutgoingAttachment] | None = None,
         sign: bool | None = None,
     ) -> str:
-        """Send only after explicit confirmation of recipients, subject, complete bodies, attachments, and signing."""
+        """Send from an optional bare address only after explicit confirmation of recipients and complete bodies."""
         return await self._service.send_message(
             account,
             to,
@@ -28,6 +29,7 @@ class SendTools:
             cc=cc,
             bcc=bcc,
             html_body=html_body,
+            from_address=from_address,
             reply_to=reply_to,
             attachments=attachments,
             sign=sign,

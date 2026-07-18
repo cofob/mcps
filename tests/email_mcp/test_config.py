@@ -17,7 +17,7 @@ def test_email_settings_parse_named_accounts_from_environment(monkeypatch: pytes
                     "smtp_host": "smtp.example.com",
                     "username": "alice@example.com",
                     "password": "secret",
-                    "from_address": "alice@example.com",
+                    "default_from_address": "alice@example.com",
                 }
             }
         ),
@@ -30,7 +30,22 @@ def test_email_settings_parse_named_accounts_from_environment(monkeypatch: pytes
     assert account.smtp_tls is TlsMode.STARTTLS
     assert account.resolved_smtp_username == "alice@example.com"
     assert account.resolved_smtp_password.get_secret_value() == "secret"
+    assert account.default_from_address == "alice@example.com"
     assert settings.mcp_transport is TransportMode.STDIO
+
+
+def test_email_settings_accept_legacy_from_address_key() -> None:
+    account = EmailAccountSettings.model_validate(
+        {
+            "imap_host": "imap.example.com",
+            "smtp_host": "smtp.example.com",
+            "username": "alice@example.com",
+            "password": "secret",
+            "from_address": "legacy@example.com",
+        }
+    )
+
+    assert account.default_from_address == "legacy@example.com"
 
 
 def test_email_settings_require_paired_smtp_credentials() -> None:
@@ -41,7 +56,7 @@ def test_email_settings_require_paired_smtp_credentials() -> None:
             username="alice@example.com",
             password=SecretStr("secret"),
             smtp_username="relay-user",
-            from_address="alice@example.com",
+            default_from_address="alice@example.com",
         )
 
 
@@ -52,7 +67,7 @@ def test_email_settings_reject_short_gpg_key_id() -> None:
             smtp_host="smtp.example.com",
             username="alice@example.com",
             password=SecretStr("secret"),
-            from_address="alice@example.com",
+            default_from_address="alice@example.com",
             gpg_key_fingerprint="DEADBEEF",
         )
 
@@ -65,7 +80,7 @@ def test_email_settings_hide_passwords_in_repr() -> None:
                 smtp_host="smtp.example.com",
                 username="alice@example.com",
                 password=SecretStr("top-secret-value"),
-                from_address="alice@example.com",
+                default_from_address="alice@example.com",
             )
         },
     )

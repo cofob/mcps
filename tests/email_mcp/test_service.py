@@ -1,4 +1,6 @@
 import base64
+from email import policy
+from email.parser import BytesParser
 from unittest.mock import AsyncMock
 
 import pytest
@@ -19,7 +21,7 @@ def make_settings(*, fingerprint: str | None = None) -> EmailSettings:
         smtp_host="smtp.example.com",
         username="alice@example.com",
         password=SecretStr("secret"),
-        from_address="alice@example.com",
+        default_from_address="alice@example.com",
         gpg_key_fingerprint=fingerprint,
     )
     return EmailSettings(EMAIL_ACCOUNTS={"work": account})
@@ -62,9 +64,38 @@ async def test_signing_failure_prevents_smtp_submission() -> None:
             cc=None,
             bcc=None,
             html_body=None,
+            from_address=None,
             reply_to=None,
             attachments=None,
             sign=None,
         )
 
     client.send_raw.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_uses_custom_from_for_header_and_smtp_envelope() -> None:
+    settings = make_settings()
+    client = AsyncMock(spec=EmailClient)
+    service = EmailService(settings, client=client)
+
+    await service.send_message(
+        "work",
+        ["bob@example.com"],
+        "subject",
+        "body",
+        cc=None,
+        bcc=None,
+        html_body=None,
+        from_address="support@example.com",
+        reply_to=None,
+        attachments=None,
+        sign=None,
+    )
+
+    account, sender, raw_message, recipients = client.send_raw.await_args.args
+    parsed = BytesParser(policy=policy.default).parsebytes(raw_message)
+    assert account == "work"
+    assert sender == "support@example.com"
+    assert parsed["From"] == "support@example.com"
+    assert recipients == ("bob@example.com",)

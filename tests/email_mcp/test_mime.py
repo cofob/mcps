@@ -18,6 +18,7 @@ from email_mcp.config import EmailAccountSettings, EmailSettings
 from email_mcp.mime import build_body, build_message, decode_attachments, prepare_addresses, serialize_body
 from email_mcp.models import OutgoingAttachment
 from email_mcp.signing import GpgSigner
+from mcp_common import UpstreamValidationError
 
 
 def make_settings(*, gpg_key_fingerprint: str | None = None, gpg_home: str | None = None) -> EmailSettings:
@@ -26,7 +27,7 @@ def make_settings(*, gpg_key_fingerprint: str | None = None, gpg_home: str | Non
         smtp_host="smtp.example.com",
         username="alice@example.com",
         password=SecretStr("secret"),
-        from_address="alice@example.com",
+        default_from_address="alice@example.com",
         gpg_key_fingerprint=gpg_key_fingerprint,
         gpg_home=Path(gpg_home) if gpg_home is not None else None,
     )
@@ -80,9 +81,50 @@ def test_unsigned_message_has_mime_attachment_and_no_bcc_header() -> None:
     parsed = BytesParser(policy=policy.default).parsebytes(prepared.raw)
 
     assert parsed["Bcc"] is None
+    assert parsed["From"] == "alice@example.com"
+    assert prepared.sender == "alice@example.com"
     assert prepared.recipients == ("bob@example.com", "copy@example.com", "hidden@example.com")
     attachment = next(part for part in parsed.walk() if part.get_filename() == "note.txt")
     assert attachment.get_payload(decode=True) == b"attachment body"
+
+
+def test_message_can_override_default_from_address() -> None:
+    settings = make_settings()
+    body = build_body("body", None, (), max_body_chars=1000)
+    addresses = prepare_addresses(["bob@example.com"], None, None, max_recipients=10)
+
+    prepared = build_message(
+        settings.account("work"),
+        addresses,
+        "Subject",
+        None,
+        body,
+        (),
+        None,
+        from_address="support@example.com",
+    )
+    parsed = BytesParser(policy=policy.default).parsebytes(prepared.raw)
+
+    assert parsed["From"] == "support@example.com"
+    assert prepared.sender == "support@example.com"
+
+
+def test_message_rejects_non_bare_from_override() -> None:
+    settings = make_settings()
+    body = build_body("body", None, (), max_body_chars=1000)
+    addresses = prepare_addresses(["bob@example.com"], None, None, max_recipients=10)
+
+    with pytest.raises(UpstreamValidationError, match="bare email address"):
+        build_message(
+            settings.account("work"),
+            addresses,
+            "Subject",
+            None,
+            body,
+            (),
+            None,
+            from_address="Support <support@example.com>",
+        )
 
 
 @pytest.mark.asyncio

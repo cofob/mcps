@@ -20,7 +20,7 @@ Highlights:
 
 - list folders and list, search, or read messages without changing read state
 - fetch complete attachments as MCP binary resources
-- send plain-text/HTML messages with bounded base64 attachment inputs
+- send plain-text/HTML messages from a configured default or per-message From address with bounded base64 attachments
 - sign outgoing MIME bodies and attachments with OpenPGP/MIME through a configured GPG keyring and agent
 - expose mandatory confirmation and direct-request privacy rules plus a detailed `skill://email-mcp/usage` resource
 
@@ -186,10 +186,11 @@ uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install 
 uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install --skip-validation
 ```
 
-Email setup includes Gmail, Outlook.com, iCloud Mail, and Fastmail presets plus custom verified-TLS IMAP/SMTP settings.
-Validation logs in to IMAP, selects `INBOX` read-only, authenticates to SMTP, and runs `NOOP`; it never sends a test
-message. Gmail, iCloud, and Fastmail commonly require app-specific passwords. Outlook.com normally requires
-OAuth2/Modern Auth, which is not supported by the password/app-password email service and may fail validation.
+Email setup includes Gmail, Outlook.com, iCloud Mail, and Fastmail presets plus custom verified-TLS IMAP/SMTP settings
+and a default From address. `email_send_message` can override that address for one message. Validation logs in to IMAP,
+selects `INBOX` read-only, authenticates to SMTP, and runs `NOOP`; it never sends a test message. Gmail, iCloud, and
+Fastmail commonly require app-specific passwords. Outlook.com normally requires OAuth2/Modern Auth, which is not
+supported by the password/app-password email service and may fail validation.
 
 ## Direct Git Usage With uv
 
@@ -211,7 +212,7 @@ Example MCP client entry using stdio:
   "command": "uvx",
   "args": ["--from", "git+https://github.com/cofob/mcps.git@<tag-or-commit>", "mcps-email"],
   "env": {
-    "EMAIL_ACCOUNTS": "{\"personal\":{\"imap_host\":\"imap.example.com\",\"smtp_host\":\"smtp.example.com\",\"username\":\"alice@example.com\",\"password\":\"app-password\",\"from_address\":\"alice@example.com\"}}"
+    "EMAIL_ACCOUNTS": "{\"personal\":{\"imap_host\":\"imap.example.com\",\"smtp_host\":\"smtp.example.com\",\"username\":\"alice@example.com\",\"password\":\"app-password\",\"default_from_address\":\"alice@example.com\"}}"
   }
 }
 ```
@@ -223,7 +224,7 @@ Run services from the workspace root. The examples below select HTTP explicitly;
 ### Email
 
 ```bash
-export EMAIL_ACCOUNTS='{"personal":{"imap_host":"imap.example.com","smtp_host":"smtp.example.com","username":"alice@example.com","password":"app-password","from_address":"alice@example.com","from_name":"Alice"}}'
+export EMAIL_ACCOUNTS='{"personal":{"imap_host":"imap.example.com","smtp_host":"smtp.example.com","username":"alice@example.com","password":"app-password","default_from_address":"alice@example.com","from_name":"Alice"}}'
 export HOST="0.0.0.0"
 export PORT="8084"
 

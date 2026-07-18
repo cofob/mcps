@@ -461,15 +461,16 @@ class EmailClient:
     async def send_raw(
         self,
         account_name: str,
+        sender: str,
         raw_message: bytes,
         recipients: Sequence[str],
     ) -> None:
-        await asyncio.to_thread(self._send_raw, account_name, raw_message, tuple(recipients))
+        await asyncio.to_thread(self._send_raw, account_name, sender, raw_message, tuple(recipients))
 
-    def _send_raw(self, account_name: str, raw_message: bytes, recipients: tuple[str, ...]) -> None:
+    def _send_raw(self, account_name: str, sender: str, raw_message: bytes, recipients: tuple[str, ...]) -> None:
         account = self._account(account_name)
         with self._smtp(account) as connection:
-            refused = connection.sendmail(account.from_address, list(recipients), raw_message)
+            refused = connection.sendmail(sender, list(recipients), raw_message)
             if refused:
                 refused_addresses = ", ".join(sorted(refused))
                 raise UpstreamValidationError(

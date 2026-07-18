@@ -1,3 +1,4 @@
+import json
 from collections import deque
 
 import pytest
@@ -75,6 +76,9 @@ async def test_collect_email_profile_masks_credentials() -> None:
     assert collected.record.environment == {}
     assert set(collected.secret_values) == {"EMAIL_ACCOUNTS"}
     assert "app-password" in collected.secret_values["EMAIL_ACCOUNTS"]
+    accounts = json.loads(collected.secret_values["EMAIL_ACCOUNTS"])
+    assert accounts["personal"]["default_from_address"] == "alice@gmail.com"
+    assert "from_address" not in accounts["personal"]
     assert prompt.secret_questions == ["IMAP password or app password"]
 
 

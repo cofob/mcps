@@ -4,7 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from mcp_common import BaseServiceSettings, ToolSettings
 
@@ -30,12 +30,12 @@ class EmailAccountSettings(BaseModel):
     password: SecretStr
     smtp_username: str | None = None
     smtp_password: SecretStr | None = None
-    from_address: str
+    default_from_address: str = Field(validation_alias=AliasChoices("default_from_address", "from_address"))
     from_name: str | None = None
     gpg_key_fingerprint: str | None = None
     gpg_home: Path | None = None
 
-    @field_validator("imap_host", "smtp_host", "username", "from_address")
+    @field_validator("imap_host", "smtp_host", "username", "default_from_address")
     @classmethod
     def validate_nonempty_header_safe(cls, value: str) -> str:
         stripped = value.strip()
@@ -57,12 +57,12 @@ class EmailAccountSettings(BaseModel):
             raise ValueError("Header values must not contain newlines.")
         return stripped
 
-    @field_validator("from_address")
+    @field_validator("default_from_address")
     @classmethod
-    def validate_from_address(cls, value: str) -> str:
+    def validate_default_from_address(cls, value: str) -> str:
         display_name, address = parseaddr(value)
         if display_name or address != value or "@" not in address or address.startswith("@") or address.endswith("@"):
-            raise ValueError("from_address must contain one bare email address.")
+            raise ValueError("default_from_address must contain one bare email address.")
         return value
 
     @field_validator("gpg_key_fingerprint")

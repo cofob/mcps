@@ -22,7 +22,7 @@ def make_client() -> EmailClient:
                     smtp_host="smtp.example.com",
                     username="alice@example.com",
                     password=SecretStr("secret"),
-                    from_address="alice@example.com",
+                    default_from_address="alice@example.com",
                 )
             }
         )
@@ -57,6 +57,18 @@ def test_validate_account_checks_readonly_inbox_and_smtp_noop_without_sending() 
     imap_mock.select.assert_called_once_with('"INBOX"', readonly=True)
     smtp_mock.noop.assert_called_once_with()
     smtp_mock.sendmail.assert_not_called()
+
+
+def test_send_raw_uses_resolved_sender_as_smtp_envelope_from() -> None:
+    client = make_client()
+    smtp_mock = Mock(spec=smtplib.SMTP)
+    smtp_mock.sendmail.return_value = {}
+    smtp_connection = cast(smtplib.SMTP, smtp_mock)
+
+    with patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)):
+        client._send_raw("work", "support@example.com", b"message", ("bob@example.com",))
+
+    smtp_mock.sendmail.assert_called_once_with("support@example.com", ["bob@example.com"], b"message")
 
 
 def test_list_messages_selects_readonly_and_fetches_peek_headers() -> None:

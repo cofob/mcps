@@ -118,6 +118,7 @@ class EmailService:
         cc: list[str] | None,
         bcc: list[str] | None,
         html_body: str | None,
+        from_address: str | None,
         reply_to: str | None,
         attachments: list[OutgoingAttachment] | None,
         sign: bool | None,
@@ -149,10 +150,12 @@ class EmailService:
             body,
             decoded_attachments,
             signature,
+            from_address=from_address,
         )
-        await self._client.send_raw(account, prepared.raw, prepared.recipients)
+        await self._client.send_raw(account, prepared.sender, prepared.raw, prepared.recipients)
         return format_sent(
             account,
+            prepared.sender,
             prepared.message_id,
             prepared.recipients,
             signed=prepared.signed,

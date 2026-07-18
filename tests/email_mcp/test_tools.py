@@ -14,7 +14,7 @@ def make_settings() -> EmailSettings:
                 smtp_host="smtp.example.com",
                 username="alice@example.com",
                 password=SecretStr("secret"),
-                from_address="alice@example.com",
+                default_from_address="alice@example.com",
             )
         }
     )
@@ -53,6 +53,7 @@ async def test_email_tools_expose_expected_metadata() -> None:
     assert send_tool.tags >= {"mutate", "write", "remote-service", "open-world"}
     assert "explicit confirmation" in (send_tool.description or "")
     assert "complete bodies" in (send_tool.description or "")
+    assert "from_address" in send_tool.parameters["properties"]
 
 
 @pytest.mark.asyncio

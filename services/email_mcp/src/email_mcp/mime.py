@@ -24,6 +24,7 @@ class PreparedAddresses:
 @dataclass(frozen=True)
 class PreparedMessage:
     raw: bytes
+    sender: str
     message_id: str
     recipients: tuple[str, ...]
     attachment_count: int
@@ -153,14 +154,19 @@ def serialize_body(body: EmailMessage) -> bytes:
 def _set_headers(
     message: EmailMessage,
     account: EmailAccountSettings,
+    from_address: str | None,
     addresses: PreparedAddresses,
     subject: str,
     reply_to: str | None,
-) -> str:
+) -> tuple[str, str]:
     if "\r" in subject or "\n" in subject:
         raise UpstreamValidationError("Subject must not contain newlines.")
+    sender_value = from_address.strip() if from_address is not None else account.default_from_address
+    sender_header, sender_address = _validate_address(sender_value)
+    if sender_header != sender_address:
+        raise UpstreamValidationError("from_address must contain one bare email address.")
     message_id = make_msgid()
-    message["From"] = formataddr((account.from_name or "", account.from_address))
+    message["From"] = formataddr((account.from_name or "", sender_address))
     message["To"] = ", ".join(addresses.to_headers)
     if addresses.cc_headers:
         message["Cc"] = ", ".join(addresses.cc_headers)
@@ -170,10 +176,10 @@ def _set_headers(
     message["Subject"] = subject
     message["Date"] = format_datetime(datetime.now(UTC))
     message["Message-ID"] = message_id
-    return message_id
+    return message_id, sender_address
 
 
-def build_message(
+def build_message(  # noqa: PLR0913
     account: EmailAccountSettings,
     addresses: PreparedAddresses,
     subject: str,
@@ -181,13 +187,15 @@ def build_message(
     body: EmailMessage,
     attachments: tuple[DecodedAttachment, ...],
     signature: bytes | None,
+    *,
+    from_address: str | None = None,
 ) -> PreparedMessage:
     if signature is None:
         message = body
-        message_id = _set_headers(message, account, addresses, subject, reply_to)
+        message_id, sender = _set_headers(message, account, from_address, addresses, subject, reply_to)
     else:
         message = EmailMessage(policy=SMTP_POLICY)
-        message_id = _set_headers(message, account, addresses, subject, reply_to)
+        message_id, sender = _set_headers(message, account, from_address, addresses, subject, reply_to)
         message.set_type("multipart/signed")
         message.set_param("protocol", "application/pgp-signature")
         message.set_param("micalg", "pgp-sha256")
@@ -202,6 +210,7 @@ def build_message(
         message.attach(signature_part)
     return PreparedMessage(
         raw=message.as_bytes(policy=SMTP_POLICY),
+        sender=sender,
         message_id=message_id,
         recipients=addresses.envelope,
         attachment_count=len(attachments),

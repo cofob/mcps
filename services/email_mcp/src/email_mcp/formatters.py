@@ -7,7 +7,11 @@ from email_mcp.models import MailboxFolder, MessageSummary, ParsedMessage
 def format_accounts(settings: EmailSettings) -> str:
     lines = [f"Configured email accounts: {len(settings.email_accounts)}"]
     for name, account in sorted(settings.email_accounts.items()):
-        identity = f"{account.from_name} <{account.from_address}>" if account.from_name else account.from_address
+        identity = (
+            f"{account.from_name} <{account.default_from_address}>"
+            if account.from_name
+            else account.default_from_address
+        )
         lines.append(f"- {name}: {identity} (GPG signing: {'configured' if account.gpg_key_fingerprint else 'off'})")
     return "\n".join(lines)
 
@@ -66,6 +70,7 @@ def format_message(account: str, folder: str, message: ParsedMessage) -> str:
 
 def format_sent(
     account: str,
+    sender: str,
     message_id: str,
     recipients: Sequence[str],
     *,
@@ -74,7 +79,7 @@ def format_sent(
 ) -> str:
     return "\n".join(
         [
-            f"Email sent from account {account}.",
+            f"Email sent from {sender} using account {account}.",
             f"- message-id: {message_id}",
             f"- recipients: {', '.join(recipients)}",
             f"- attachments: {attachment_count}",

@@ -181,7 +181,7 @@ async def _collect_email_account(prompt: PromptIO, existing: set[str]) -> tuple[
     if preset_name == "outlook":
         prompt.message("Outlook.com normally requires OAuth2/Modern Auth; password validation may be rejected.")
     endpoint = await _email_endpoint(prompt, preset_name)
-    address = await _required(prompt, "Email/from address")
+    address = await _required(prompt, "Default From address")
     username_default = address.split("@", maxsplit=1)[0] if preset_name == "icloud" else address
     username = await _required(prompt, "IMAP username", default=username_default)
     password = await _required(prompt, "IMAP password or app password", secret=True)
@@ -194,7 +194,7 @@ async def _collect_email_account(prompt: PromptIO, existing: set[str]) -> tuple[
         "smtp_tls": endpoint.smtp_tls,
         "username": username,
         "password": password,
-        "from_address": address,
+        "default_from_address": address,
     }
     from_name = await prompt.text("Display name (optional)")
     if from_name:
