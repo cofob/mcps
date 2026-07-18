@@ -19,6 +19,20 @@ downloading attachments never mark messages as read.
 Every tool that accesses mail requires an explicit `account` name.
 For maximum portability across IMAP servers, textual search filters currently accept ASCII text.
 
+## Agent Usage Policy
+
+The server publishes mandatory agent instructions and a detailed Markdown skill resource at
+`skill://email-mcp/usage`. The resource covers consent boundaries, folder-scoped UIDs, efficient search filters,
+attachments, SMTP failure handling, and OpenPGP/MIME signing.
+
+- Agents may call account, folder, or message list tools and `email_search_messages` only when the user directly asks
+  to list, browse, search, find, or check mail or mail configuration. They must not inspect mail proactively.
+- Before every `email_send_message` call, the agent must show the exact account, recipients, subject, complete text and
+  HTML bodies, attachment names, and resolved signing choice, then obtain explicit confirmation in a subsequent turn.
+- Confirmation applies to one exact message. Any change requires a new complete preview and confirmation.
+- Because SMTP submission is non-idempotent, agents must not automatically retry a send whose delivery status may be
+  ambiguous.
+
 ## Account Configuration
 
 The recommended local setup is the interactive installer, which offers provider presets, masked credential prompts,

@@ -22,6 +22,7 @@ Highlights:
 - fetch complete attachments as MCP binary resources
 - send plain-text/HTML messages with bounded base64 attachment inputs
 - sign outgoing MIME bodies and attachments with OpenPGP/MIME through a configured GPG keyring and agent
+- expose mandatory confirmation and direct-request privacy rules plus a detailed `skill://email-mcp/usage` resource
 
 Package: [services/email_mcp](/Users/cofob/Development/mcps/services/email_mcp)
 
@@ -227,6 +228,8 @@ uv run --package email-mcp email-mcp --transport http
 ```
 
 See [the email service README](/Users/cofob/Development/mcps/services/email_mcp) for attachments, limits, and GPG setup.
+Email agents must preview complete message bodies and receive explicit confirmation before each send. Account, folder,
+and message listing and message search are allowed only when directly requested by the user.
 
 ### Navidrome
 

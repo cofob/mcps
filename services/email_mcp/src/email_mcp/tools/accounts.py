@@ -6,9 +6,9 @@ class AccountTools:
         self._service = service
 
     async def list_accounts(self) -> str:
-        """List configured email account names and non-secret identities."""
+        """List configured email accounts only when the user directly requests them."""
         return self._service.list_accounts()
 
     async def list_folders(self, account: str) -> str:
-        """List IMAP folders for a configured email account."""
+        """List IMAP folders only when the user directly requests them."""
         return await self._service.list_folders(account)

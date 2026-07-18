@@ -16,7 +16,7 @@ class MessageTools:
         limit: int = 20,
         offset: int = 0,
     ) -> str:
-        """List recent messages in an IMAP folder without marking them read."""
+        """List recent messages only when directly requested, without marking them read."""
         return await self._service.list_messages(account, folder, limit, offset)
 
     async def search_messages(  # noqa: PLR0913
@@ -33,7 +33,7 @@ class MessageTools:
         limit: int = 20,
         offset: int = 0,
     ) -> str:
-        """Search messages with portable IMAP filters without changing read state."""
+        """Search mail only when directly requested, using portable filters without changing read state."""
         return await self._service.search_messages(
             account,
             folder,

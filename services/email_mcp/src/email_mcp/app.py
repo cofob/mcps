@@ -6,6 +6,7 @@ from starlette.applications import Starlette
 
 from email_mcp import __version__
 from email_mcp.config import EmailSettings
+from email_mcp.guidance import EMAIL_MCP_INSTRUCTIONS, email_usage_skill
 from email_mcp.service import EmailService
 from email_mcp.tools import AccountTools, MessageTools, SendTools
 from mcp_common import (
@@ -53,14 +54,30 @@ def _make_tool_specs(service: EmailService) -> list[ToolSpec]:
     ]
 
 
+def _register_usage_skill(mcp: FastMCP) -> None:
+    @mcp.resource(
+        "skill://email-mcp/usage",
+        name="email-mcp-usage",
+        title="Email MCP usage skill",
+        description="Safe search, reading, sending, attachment, and OpenPGP/MIME usage guidance.",
+        mime_type="text/markdown",
+        tags={"skill", "email", "safety", "usage"},
+    )
+    def usage_skill() -> str:
+        return email_usage_skill()
+
+    del usage_skill
+
+
 def create_mcp(settings: EmailSettings) -> FastMCP:
     auth = build_auth_provider(settings.oauth2) if settings.mcp_auth_mode.value == "oauth2" else None
-    mcp = FastMCP(name="email-mcp", auth=auth)
+    mcp = FastMCP(name="email-mcp", instructions=EMAIL_MCP_INSTRUCTIONS, auth=auth)
     register_enabled_tools(
         cast(SupportsToolRegistration, mcp),
         _make_tool_specs(EmailService(settings)),
         settings.tools,
     )
+    _register_usage_skill(mcp)
     return mcp
 
 

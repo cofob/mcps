@@ -19,7 +19,7 @@ class SendTools:
         attachments: list[OutgoingAttachment] | None = None,
         sign: bool | None = None,
     ) -> str:
-        """Send an SMTP email, optionally with HTML, attachments, and OpenPGP/MIME signing."""
+        """Send only after explicit confirmation of recipients, subject, complete bodies, attachments, and signing."""
         return await self._service.send_message(
             account,
             to,
