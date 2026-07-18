@@ -44,6 +44,9 @@ system-keyring storage, and non-sending IMAP/SMTP validation:
 uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install
 ```
 
+Re-run the same command and choose `Reconfigure an existing profile` to change account settings such as the default
+From address. Existing passwords can be retained without displaying or re-entering them.
+
 The manual environment format remains available for containers and custom deployments.
 
 Set `EMAIL_ACCOUNTS` to a JSON object. Passwords are represented as Pydantic secrets and are never included in account

@@ -4,6 +4,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from keyring.errors import KeyringError
 from pydantic import ValidationError
 
 from mcps_workspace.agents import AgentAdapter, agent_adapters
@@ -13,12 +14,14 @@ from mcps_workspace.prompts import (
     PromptIO,
     QuestionaryPrompt,
     choose_agents,
+    choose_profile_to_reconfigure,
     choose_services,
     collect_profile,
 )
 from mcps_workspace.secrets import (
     KeyringSecretBackend,
     backend_for,
+    resolve_environment,
     secret_key,
     store_profile_secrets,
 )
@@ -51,8 +54,15 @@ async def _collect_validated(
     secret_store: SecretStoreKind,
     *,
     skip_validation: bool,
+    existing: CollectedProfile | None = None,
 ) -> CollectedProfile:
-    collected = await collect_profile(prompt, service, secret_store)
+    collected = await collect_profile(
+        prompt,
+        service,
+        secret_store,
+        profile_name=existing.record.name if existing is not None else None,
+        existing=existing,
+    )
     if skip_validation:
         return collected
     while True:
@@ -77,6 +87,7 @@ async def _collect_validated(
                     service,
                     secret_store,
                     profile_name=collected.record.name,
+                    existing=collected,
                 )
                 continue
             if action == "unverified":
@@ -130,11 +141,19 @@ async def _store_and_smoke(
     try:
         store_profile_secrets(collected.record, collected.secret_values, config_dir=store.config_dir)
         store.put(collected.record)
-        return await smoke_test_profile(collected.record, store.config_dir)
+        tool_count = await smoke_test_profile(collected.record, store.config_dir)
     except BaseException:
         store.save(original_config)
         _restore_secrets(collected, previous, store.config_dir)
         raise
+    else:
+        previous_record = original_config.profiles.get(collected.record.key)
+        if previous_record is not None and previous_record.secret_store is collected.record.secret_store:
+            active_keys = set(collected.record.secret_environment.values())
+            for previous_key in previous_record.secret_environment.values():
+                if previous_key not in active_keys:
+                    backend.delete(previous_key)
+        return tool_count
 
 
 async def _register_profile(
@@ -171,7 +190,7 @@ async def _register_profile(
     return failures
 
 
-async def install(
+async def install(  # noqa: PLR0912
     prompt: PromptIO,
     *,
     config_dir: Path | None = None,
@@ -182,30 +201,56 @@ async def install(
     detected = [agent for agent, adapter in adapters.items() if adapter.detected()]
     if not detected:
         raise InstallationAbortedError("No supported agent CLI was detected.")
-    services = await choose_services(prompt)
+    store = ProfileStore(config_dir)
+    existing_profiles = store.load().profiles
+    selected_existing = await choose_profile_to_reconfigure(prompt, existing_profiles)
+    services = [selected_existing.service] if selected_existing is not None else await choose_services(prompt)
     if not services:
         raise InstallationAbortedError("Select at least one MCP service.")
     selected_agents = await choose_agents(prompt, detected)
     if not selected_agents:
         raise InstallationAbortedError("Select at least one agent.")
-    secret_store = await _choose_secret_store(prompt, requested_secret_store)
+    if selected_existing is not None:
+        if requested_secret_store is not None and requested_secret_store is not selected_existing.secret_store:
+            raise InstallationAbortedError(
+                "Reconfiguration keeps the profile's current secret store; "
+                "omit --secret-store or use its current value."
+            )
+        secret_store = selected_existing.secret_store
+        try:
+            resolved = resolve_environment(selected_existing, config_dir=store.config_dir)
+        except (KeyringError, ValueError, RuntimeError) as exc:
+            raise InstallationAbortedError(f"Could not load existing profile secrets: {exc}") from exc
+        existing_collected = CollectedProfile(
+            record=selected_existing.model_copy(deep=True),
+            secret_values={name: resolved[name] for name in selected_existing.secret_environment},
+        )
+    else:
+        secret_store = await _choose_secret_store(prompt, requested_secret_store)
+        existing_collected = None
     profiles = [
         await _collect_validated(
             prompt,
             service,
             secret_store,
             skip_validation=skip_validation,
+            existing=existing_collected
+            if selected_existing is not None and service is selected_existing.service
+            else None,
         )
         for service in services
     ]
-    store = ProfileStore(config_dir)
-    existing_profiles = store.load().profiles
     confirmed_profiles: list[CollectedProfile] = []
     registration_failures: list[str] = []
     for collected in profiles:
-        if collected.record.key in existing_profiles and not await prompt.confirm(
-            f"Replace existing profile {collected.record.key}?",
-            default=False,
+        is_selected_reconfiguration = selected_existing is not None and collected.record.key == selected_existing.key
+        if (
+            not is_selected_reconfiguration
+            and collected.record.key in existing_profiles
+            and not await prompt.confirm(
+                f"Replace existing profile {collected.record.key}?",
+                default=False,
+            )
         ):
             prompt.message(f"Skipped profile {collected.record.key}.")
             continue

@@ -4,7 +4,7 @@ from collections import deque
 import pytest
 
 from mcps_workspace import prompts
-from mcps_workspace.models import SecretStoreKind, ServiceKind
+from mcps_workspace.models import CollectedProfile, ProfileRecord, SecretStoreKind, ServiceKind
 from mcps_workspace.prompts import EMAIL_PRESETS, PromptIO, QuestionaryPrompt, choose_services, collect_profile
 
 
@@ -95,6 +95,62 @@ async def test_collect_filesystem_profile_expands_user_path() -> None:
 
     assert collected.record.name == "docs"
     assert collected.record.environment["FILESYSTEM_ROOT_DIR"].endswith("/Documents")
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_email_profile_keeps_password_and_updates_default_from() -> None:
+    existing = CollectedProfile(
+        record=ProfileRecord(service=ServiceKind.EMAIL, name="mail", secret_store=SecretStoreKind.KEYRING),
+        secret_values={
+            "EMAIL_ACCOUNTS": json.dumps(
+                {
+                    "personal": {
+                        "imap_host": "imap.example.com",
+                        "imap_port": 993,
+                        "imap_tls": "implicit",
+                        "smtp_host": "smtp.example.com",
+                        "smtp_port": 587,
+                        "smtp_tls": "starttls",
+                        "username": "alice@example.com",
+                        "password": "existing-password",
+                        "default_from_address": "alice@example.com",
+                    }
+                }
+            )
+        },
+    )
+    prompt = FakePrompt(
+        [
+            "edit",
+            "imap.example.com",
+            "993",
+            "implicit",
+            "smtp.example.com",
+            "587",
+            "starttls",
+            "support@example.com",
+            "alice@example.com",
+            True,
+            "",
+            False,
+            False,
+            False,
+        ]
+    )
+
+    collected = await collect_profile(
+        prompt,
+        ServiceKind.EMAIL,
+        SecretStoreKind.KEYRING,
+        profile_name="mail",
+        existing=existing,
+    )
+
+    accounts = json.loads(collected.secret_values["EMAIL_ACCOUNTS"])
+    existing_accounts = json.loads(existing.secret_values["EMAIL_ACCOUNTS"])
+    assert accounts["personal"]["default_from_address"] == "support@example.com"
+    assert accounts["personal"]["password"] == existing_accounts["personal"]["password"]
+    assert prompt.secret_questions == []
 
 
 @pytest.mark.asyncio

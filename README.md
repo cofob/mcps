@@ -161,6 +161,8 @@ The wizard:
 - configures named profiles for Email, Filesystem, Navidrome, slskd, and Telegram TXT export
 - validates remote credentials and local paths before writing configuration
 - stores passwords and API keys in the system keyring, with an explicit restricted-file fallback
+- reconfigures existing profiles with saved non-secret defaults and an option to retain each stored password or API key
+  without displaying it
 - performs an MCP stdio initialization and tool-discovery smoke test
 - previews every profile and asks before replacing existing profile or agent entries
 
@@ -175,8 +177,10 @@ Profiles use the platform user-configuration directory returned by `platformdirs
 selected, secrets live in `secrets.json`; the installer creates the directory with user-only permissions and uses mode
 `0600` on POSIX systems.
 
-Re-run `install` to add another named profile or update an existing one. Existing agent configuration is backed up with
-an `.mcps-backup-<timestamp>` suffix before replacement. Use these options for troubleshooting or automation:
+Re-run `install` and select `Reconfigure an existing profile` to update one in place. The wizard preserves its current
+secret-store backend, lets you keep saved credentials without re-entering them, validates and smoke-tests the revised
+profile, and previews the replacement before writing. Existing agent configuration is backed up with an
+`.mcps-backup-<timestamp>` suffix before replacement. Use these options for troubleshooting or automation:
 
 ```bash
 # Deliberately use the restricted local secrets file

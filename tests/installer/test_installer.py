@@ -7,6 +7,7 @@ from mcps_workspace import installer
 from mcps_workspace.agents import RegistrationResult
 from mcps_workspace.models import AgentKind, ProfileRecord, SecretStoreKind, ServiceKind
 from mcps_workspace.prompts import PromptIO
+from mcps_workspace.secrets import FileSecretBackend, store_profile_secrets
 from mcps_workspace.storage import ProfileStore
 from mcps_workspace.validation import ProfileValidationError
 
@@ -119,3 +120,77 @@ async def test_validation_failure_can_be_explicitly_installed_unverified(
 
     assert not collected.record.verified
     assert any("credentials rejected" in message for message in prompt.messages)
+
+
+@pytest.mark.asyncio
+async def test_existing_profile_can_be_reconfigured_without_new_secret_store_setup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    old_root = tmp_path / "old"
+    new_root = tmp_path / "new"
+    old_root.mkdir()
+    new_root.mkdir()
+    config_dir = tmp_path / "config"
+    store = ProfileStore(config_dir)
+    store.put(
+        ProfileRecord(
+            service=ServiceKind.FILESYSTEM,
+            name="docs",
+            environment={"FILESYSTEM_ROOT_DIR": str(old_root)},
+            secret_store=SecretStoreKind.KEYRING,
+        )
+    )
+    adapter = FakeAdapter()
+    monkeypatch.setattr(installer, "agent_adapters", lambda: {AgentKind.CODEX: adapter})
+    prompt = ScriptedPrompt(
+        text=[str(new_root)],
+        confirms=[True],
+        selects=["reconfigure", "filesystem:docs"],
+        checkboxes=[["codex"]],
+    )
+
+    await installer.install(prompt, config_dir=config_dir)
+
+    stored = store.get("filesystem", "docs")
+    assert stored.environment["FILESYSTEM_ROOT_DIR"] == str(new_root)
+    assert stored.verified
+    assert [record.server_name for record in adapter.records] == ["mcps-filesystem-docs"]
+
+
+@pytest.mark.asyncio
+async def test_reconfiguration_removes_secrets_no_longer_used(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = ProfileStore(tmp_path)
+    original_record = ProfileRecord(
+        service=ServiceKind.SLSKD,
+        name="home",
+        environment={"SLSKD_URL": "https://slskd.example", "SLSKD_USERNAME": "alice"},
+        secret_store=SecretStoreKind.FILE,
+    )
+    store_profile_secrets(original_record, {"SLSKD_PASSWORD": "old-secret"}, config_dir=tmp_path)
+    store.put(original_record)
+    original_config = store.load()
+    replacement = installer.CollectedProfile(
+        record=ProfileRecord(
+            service=ServiceKind.SLSKD,
+            name="home",
+            environment={"SLSKD_URL": "https://slskd.example"},
+            secret_store=SecretStoreKind.FILE,
+        ),
+        secret_values={"SLSKD_API_KEY": "new-secret"},
+    )
+
+    async def smoke(record: ProfileRecord, config_dir: Path) -> int:
+        del record, config_dir
+        return 4
+
+    monkeypatch.setattr(installer, "smoke_test_profile", smoke)
+
+    assert await installer._store_and_smoke(store, replacement, original_config) == 4
+    backend = FileSecretBackend(tmp_path / "secrets.json")
+    assert backend.get("slskd/home/SLSKD_API_KEY") == "new-secret"
+    with pytest.raises(ValueError, match="not found"):
+        backend.get("slskd/home/SLSKD_PASSWORD")
