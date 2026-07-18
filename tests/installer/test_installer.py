@@ -26,19 +26,19 @@ class ScriptedPrompt(PromptIO):
         self.checkbox_answers = deque(checkboxes or [])
         self.messages: list[str] = []
 
-    def text(self, message: str, *, default: str = "", secret: bool = False) -> str:
+    async def text(self, message: str, *, default: str = "", secret: bool = False) -> str:
         del message, default, secret
         return self.text_answers.popleft()
 
-    def confirm(self, message: str, *, default: bool = False) -> bool:
+    async def confirm(self, message: str, *, default: bool = False) -> bool:
         del message, default
         return self.confirm_answers.popleft()
 
-    def select(self, message: str, choices: list[tuple[str, str]]) -> str:
+    async def select(self, message: str, choices: list[tuple[str, str]]) -> str:
         del message, choices
         return self.select_answers.popleft()
 
-    def checkbox(self, message: str, choices: list[tuple[str, str]]) -> list[str]:
+    async def checkbox(self, message: str, choices: list[tuple[str, str]]) -> list[str]:
         del message, choices
         return self.checkbox_answers.popleft()
 

@@ -39,7 +39,7 @@ The recommended local setup is the interactive installer, which offers provider 
 system-keyring storage, and non-sending IMAP/SMTP validation:
 
 ```bash
-uvx --from 'git+https://github.com/cofob/mcps.git' install
+uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install
 ```
 
 The manual environment format remains available for containers and custom deployments.

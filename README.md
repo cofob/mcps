@@ -149,8 +149,11 @@ uv run pytest
 Install one or more services into supported local coding agents without publishing anything to PyPI:
 
 ```bash
-uvx --from 'git+https://github.com/cofob/mcps.git' install
+uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install
 ```
+
+`--no-cache --refresh` makes `uv` use a temporary cache and refresh the Git source instead of reusing a previous
+checkout.
 
 The wizard:
 
@@ -177,10 +180,10 @@ an `.mcps-backup-<timestamp>` suffix before replacement. Use these options for t
 
 ```bash
 # Deliberately use the restricted local secrets file
-uvx --from 'git+https://github.com/cofob/mcps.git' install --secret-store file
+uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install --secret-store file
 
 # Configure without network or credential checks; the profile is marked unverified
-uvx --from 'git+https://github.com/cofob/mcps.git' install --skip-validation
+uvx --no-cache --refresh --from 'git+https://github.com/cofob/mcps.git' install --skip-validation
 ```
 
 Email setup includes Gmail, Outlook.com, iCloud Mail, and Fastmail presets plus custom verified-TLS IMAP/SMTP settings.

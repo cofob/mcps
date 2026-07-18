@@ -1,7 +1,10 @@
 from collections import deque
 
+import pytest
+
+from mcps_workspace import prompts
 from mcps_workspace.models import SecretStoreKind, ServiceKind
-from mcps_workspace.prompts import EMAIL_PRESETS, PromptIO, collect_profile
+from mcps_workspace.prompts import EMAIL_PRESETS, PromptIO, QuestionaryPrompt, choose_services, collect_profile
 
 
 class FakePrompt(PromptIO):
@@ -10,7 +13,7 @@ class FakePrompt(PromptIO):
         self.secret_questions: list[str] = []
         self.messages: list[str] = []
 
-    def text(self, message: str, *, default: str = "", secret: bool = False) -> str:
+    async def text(self, message: str, *, default: str = "", secret: bool = False) -> str:
         del default
         if secret:
             self.secret_questions.append(message)
@@ -18,19 +21,19 @@ class FakePrompt(PromptIO):
         assert isinstance(answer, str)
         return answer
 
-    def confirm(self, message: str, *, default: bool = False) -> bool:
+    async def confirm(self, message: str, *, default: bool = False) -> bool:
         del message, default
         answer = self.answers.popleft()
         assert isinstance(answer, bool)
         return answer
 
-    def select(self, message: str, choices: list[tuple[str, str]]) -> str:
+    async def select(self, message: str, choices: list[tuple[str, str]]) -> str:
         del message, choices
         answer = self.answers.popleft()
         assert isinstance(answer, str)
         return answer
 
-    def checkbox(self, message: str, choices: list[tuple[str, str]]) -> list[str]:
+    async def checkbox(self, message: str, choices: list[tuple[str, str]]) -> list[str]:
         del message, choices
         raise AssertionError("checkbox was not expected")
 
@@ -45,7 +48,8 @@ def test_email_presets_are_tls_only() -> None:
     assert all(preset.imap_tls in {"implicit", "starttls"} for preset in EMAIL_PRESETS.values())
 
 
-def test_collect_email_profile_masks_credentials() -> None:
+@pytest.mark.asyncio
+async def test_collect_email_profile_masks_credentials() -> None:
     prompt = FakePrompt(
         [
             "personal",
@@ -60,7 +64,7 @@ def test_collect_email_profile_masks_credentials() -> None:
         ]
     )
 
-    collected = collect_profile(
+    collected = await collect_profile(
         prompt,
         ServiceKind.EMAIL,
         SecretStoreKind.KEYRING,
@@ -74,10 +78,11 @@ def test_collect_email_profile_masks_credentials() -> None:
     assert prompt.secret_questions == ["IMAP password or app password"]
 
 
-def test_collect_filesystem_profile_expands_user_path() -> None:
+@pytest.mark.asyncio
+async def test_collect_filesystem_profile_expands_user_path() -> None:
     prompt = FakePrompt(["~/Documents"])
 
-    collected = collect_profile(
+    collected = await collect_profile(
         prompt,
         ServiceKind.FILESYSTEM,
         SecretStoreKind.FILE,
@@ -86,3 +91,24 @@ def test_collect_filesystem_profile_expands_user_path() -> None:
 
     assert collected.record.name == "docs"
     assert collected.record.environment["FILESYSTEM_ROOT_DIR"].endswith("/Documents")
+
+
+@pytest.mark.asyncio
+async def test_questionary_prompt_uses_async_api_inside_running_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class AsyncQuestion:
+        async def ask_async(self) -> list[str]:
+            return ["email"]
+
+    def fake_checkbox(
+        message: str,
+        *,
+        choices: list[prompts.questionary.Choice],
+    ) -> AsyncQuestion:
+        del message, choices
+        return AsyncQuestion()
+
+    monkeypatch.setattr(prompts.questionary, "checkbox", fake_checkbox)
+
+    assert await choose_services(QuestionaryPrompt()) == [ServiceKind.EMAIL]

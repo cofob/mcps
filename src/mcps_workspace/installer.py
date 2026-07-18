@@ -31,7 +31,7 @@ class InstallationAbortedError(RuntimeError):
     pass
 
 
-def _choose_secret_store(prompt: PromptIO, requested: SecretStoreKind | None) -> SecretStoreKind:
+async def _choose_secret_store(prompt: PromptIO, requested: SecretStoreKind | None) -> SecretStoreKind:
     if requested is SecretStoreKind.FILE:
         return SecretStoreKind.FILE
     available = KeyringSecretBackend().probe()
@@ -40,7 +40,7 @@ def _choose_secret_store(prompt: PromptIO, requested: SecretStoreKind | None) ->
     if requested is SecretStoreKind.KEYRING:
         raise InstallationAbortedError("No usable system keyring backend is available.")
     prompt.message("No usable system keyring backend was found.")
-    if prompt.confirm("Use a restricted local secrets file instead?", default=False):
+    if await prompt.confirm("Use a restricted local secrets file instead?", default=False):
         return SecretStoreKind.FILE
     raise InstallationAbortedError("Secure secret storage is required.")
 
@@ -52,7 +52,7 @@ async def _collect_validated(
     *,
     skip_validation: bool,
 ) -> CollectedProfile:
-    collected = collect_profile(prompt, service, secret_store)
+    collected = await collect_profile(prompt, service, secret_store)
     if skip_validation:
         return collected
     while True:
@@ -60,7 +60,7 @@ async def _collect_validated(
             warnings = await validate_profile(collected)
         except ProfileValidationError as exc:
             prompt.message(f"Validation failed: {exc}")
-            action = prompt.select(
+            action = await prompt.select(
                 "How should the installer continue?",
                 [
                     ("Retry validation", "retry"),
@@ -72,7 +72,7 @@ async def _collect_validated(
             if action == "retry":
                 continue
             if action == "edit":
-                collected = collect_profile(
+                collected = await collect_profile(
                     prompt,
                     service,
                     secret_store,
@@ -137,7 +137,7 @@ async def _store_and_smoke(
         raise
 
 
-def _register_profile(
+async def _register_profile(
     prompt: PromptIO,
     collected: CollectedProfile,
     adapters: dict[AgentKind, AgentAdapter],
@@ -153,7 +153,7 @@ def _register_profile(
             failures.append(failure)
             prompt.message(f"Registration check failed for {failure}")
             continue
-        if exists and not prompt.confirm(
+        if exists and not await prompt.confirm(
             f"Replace existing {agent.display_name} entry {collected.record.server_name}?",
             default=False,
         ):
@@ -182,13 +182,13 @@ async def install(
     detected = [agent for agent, adapter in adapters.items() if adapter.detected()]
     if not detected:
         raise InstallationAbortedError("No supported agent CLI was detected.")
-    services = choose_services(prompt)
+    services = await choose_services(prompt)
     if not services:
         raise InstallationAbortedError("Select at least one MCP service.")
-    selected_agents = choose_agents(prompt, detected)
+    selected_agents = await choose_agents(prompt, detected)
     if not selected_agents:
         raise InstallationAbortedError("Select at least one agent.")
-    secret_store = _choose_secret_store(prompt, requested_secret_store)
+    secret_store = await _choose_secret_store(prompt, requested_secret_store)
     profiles = [
         await _collect_validated(
             prompt,
@@ -203,7 +203,7 @@ async def install(
     confirmed_profiles: list[CollectedProfile] = []
     registration_failures: list[str] = []
     for collected in profiles:
-        if collected.record.key in existing_profiles and not prompt.confirm(
+        if collected.record.key in existing_profiles and not await prompt.confirm(
             f"Replace existing profile {collected.record.key}?",
             default=False,
         ):
@@ -214,7 +214,7 @@ async def install(
     if not profiles:
         raise InstallationAbortedError("No profiles remain to install.")
     _preview(prompt, profiles, selected_agents)
-    if not prompt.confirm("Apply these changes?", default=True):
+    if not await prompt.confirm("Apply these changes?", default=True):
         raise InstallationAbortedError("Installation cancelled before writing changes.")
 
     for collected in profiles:
@@ -224,7 +224,7 @@ async def install(
         except Exception as exc:
             raise InstallationAbortedError(f"MCP smoke test failed for {collected.record.server_name}: {exc}") from exc
         prompt.message(f"Stored {collected.record.server_name}; MCP exposed {tool_count} tools.")
-        registration_failures.extend(_register_profile(prompt, collected, adapters, selected_agents))
+        registration_failures.extend(await _register_profile(prompt, collected, adapters, selected_agents))
     if registration_failures:
         summary = "; ".join(registration_failures)
         raise InstallationAbortedError(f"Some agent registrations failed; profiles were retained: {summary}")
