@@ -48,10 +48,16 @@ def format_message(account: str, folder: str, message: ParsedMessage) -> str:
     ]
     if message.cc:
         lines.append(f"- cc: {message.cc}")
+    if message.reply_to:
+        lines.append(f"- reply-to: {message.reply_to}")
     if summary.date:
         lines.append(f"- date: {summary.date}")
     if summary.message_id:
         lines.append(f"- message-id: {summary.message_id}")
+    if message.in_reply_to:
+        lines.append(f"- in-reply-to: {' '.join(message.in_reply_to)}")
+    if message.references:
+        lines.append(f"- references: {' '.join(message.references)}")
     if summary.flags:
         lines.append(f"- flags: {', '.join(summary.flags)}")
     lines.extend([f"- size: {summary.size_bytes} bytes", f"- body format: {message.body_format}"])
@@ -68,6 +74,21 @@ def format_message(account: str, folder: str, message: ParsedMessage) -> str:
     return "\n".join(lines)
 
 
+def format_thread(
+    account: str,
+    folder: str,
+    source_uid: int,
+    messages: Sequence[ParsedMessage],
+) -> str:
+    lines = [
+        f"Thread in {account}/{folder} containing UID {source_uid}: {len(messages)} message(s)",
+        "Messages are ordered by ascending folder-scoped UID.",
+    ]
+    for message in messages:
+        lines.extend(["", "---", "", format_message(account, folder, message)])
+    return "\n".join(lines)
+
+
 def format_sent(
     account: str,
     sender: str,
@@ -80,6 +101,30 @@ def format_sent(
     return "\n".join(
         [
             f"Email sent from {sender} using account {account}.",
+            f"- message-id: {message_id}",
+            f"- recipients: {', '.join(recipients)}",
+            f"- attachments: {attachment_count}",
+            f"- OpenPGP/MIME signed: {str(signed).lower()}",
+        ]
+    )
+
+
+def format_reply_sent(  # noqa: PLR0913
+    account: str,
+    folder: str,
+    source_uid: int,
+    source_message_id: str,
+    sender: str,
+    message_id: str,
+    recipients: Sequence[str],
+    *,
+    signed: bool,
+    attachment_count: int,
+) -> str:
+    return "\n".join(
+        [
+            f"Email reply sent from {sender} using account {account}.",
+            f"- replied to: {folder} UID {source_uid} ({source_message_id})",
             f"- message-id: {message_id}",
             f"- recipients: {', '.join(recipients)}",
             f"- attachments: {attachment_count}",

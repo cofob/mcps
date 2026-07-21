@@ -52,6 +52,16 @@ class MessageTools:
         """Read one message by stable folder-scoped IMAP UID without marking it read."""
         return await self._service.get_message(account, folder, uid)
 
+    async def get_thread(
+        self,
+        account: str,
+        uid: int,
+        folder: str = "INBOX",
+        limit: int = 20,
+    ) -> str:
+        """Read the RFC-header-linked thread containing one directly requested message without changing read state."""
+        return await self._service.get_thread(account, folder, uid, limit)
+
     async def get_attachment(
         self,
         account: str,

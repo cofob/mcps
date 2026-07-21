@@ -109,6 +109,46 @@ def test_message_can_override_default_from_address() -> None:
     assert prepared.sender == "support@example.com"
 
 
+def test_reply_message_serializes_in_reply_to_and_references() -> None:
+    settings = make_settings()
+    body = build_body("reply body", None, (), max_body_chars=1000)
+    addresses = prepare_addresses(["bob@example.com"], None, None, max_recipients=10)
+
+    prepared = build_message(
+        settings.account("work"),
+        addresses,
+        "Re: Subject",
+        None,
+        body,
+        (),
+        None,
+        in_reply_to="<parent@example.com>",
+        references=("<root@example.com>", "<parent@example.com>"),
+    )
+    parsed = BytesParser(policy=policy.default).parsebytes(prepared.raw)
+
+    assert parsed["In-Reply-To"] == "<parent@example.com>"
+    assert parsed["References"] == "<root@example.com> <parent@example.com>"
+
+
+def test_reply_message_rejects_invalid_message_identifier() -> None:
+    settings = make_settings()
+    body = build_body("reply body", None, (), max_body_chars=1000)
+    addresses = prepare_addresses(["bob@example.com"], None, None, max_recipients=10)
+
+    with pytest.raises(UpstreamValidationError, match="Invalid RFC message identifier"):
+        build_message(
+            settings.account("work"),
+            addresses,
+            "Re: Subject",
+            None,
+            body,
+            (),
+            None,
+            in_reply_to="parent@example.com",
+        )
+
+
 def test_message_rejects_non_bare_from_override() -> None:
     settings = make_settings()
     body = build_body("body", None, (), max_body_chars=1000)

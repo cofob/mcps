@@ -109,6 +109,72 @@ def test_get_message_fetches_body_with_peek_from_readonly_mailbox() -> None:
     connection_mock.uid.assert_called_once_with("FETCH", "7", "(UID FLAGS RFC822.SIZE BODY.PEEK[])")
 
 
+def test_get_thread_follows_message_id_references_with_readonly_peek_fetches() -> None:
+    client = make_client()
+    connection_mock = Mock(spec=imaplib.IMAP4)
+    connection_mock.select.return_value = ("OK", [b"3"])
+    target = (
+        b"Subject: Re: Topic\r\n"
+        b"From: bob@example.com\r\n"
+        b"To: alice@example.com\r\n"
+        b"Message-ID: <child@example.com>\r\n"
+        b"In-Reply-To: <parent@example.com>\r\n"
+        b"References: <root@example.com> <parent@example.com>\r\n\r\n"
+        b"target"
+    )
+    parent = (
+        b"Subject: Topic\r\n"
+        b"From: alice@example.com\r\n"
+        b"To: bob@example.com\r\n"
+        b"Message-ID: <parent@example.com>\r\n"
+        b"References: <root@example.com>\r\n\r\n"
+        b"parent"
+    )
+    reply = (
+        b"Subject: Re: Topic\r\n"
+        b"From: bob@example.com\r\n"
+        b"To: alice@example.com\r\n"
+        b"Message-ID: <reply@example.com>\r\n"
+        b"In-Reply-To: <child@example.com>\r\n"
+        b"References: <root@example.com> <parent@example.com> <child@example.com>\r\n\r\n"
+        b"reply"
+    )
+    connection_mock.uid.side_effect = [
+        ("OK", [(b"7 (UID 7 FLAGS () RFC822.SIZE 250)", target), b")"]),
+        ("OK", [b"5 7 9"]),
+        (
+            "OK",
+            [
+                (b"5 (UID 5 FLAGS (\\Seen) RFC822.SIZE 180)", parent),
+                (b"9 (UID 9 FLAGS () RFC822.SIZE 280)", reply),
+                b")",
+            ],
+        ),
+    ]
+    connection = cast(imaplib.IMAP4, connection_mock)
+
+    with patch.object(client, "_imap", side_effect=lambda _: mocked_imap(connection)):
+        messages = client._get_thread("work", "INBOX", 7, 3)
+
+    assert [message.summary.uid for message in messages] == [5, 7, 9]
+    assert messages[1].in_reply_to == ("<parent@example.com>",)
+    assert messages[1].references == ("<root@example.com>", "<parent@example.com>")
+    connection_mock.select.assert_called_once_with('"INBOX"', readonly=True)
+    assert connection_mock.uid.call_args_list[0].args == (
+        "FETCH",
+        "7",
+        "(UID FLAGS RFC822.SIZE BODY.PEEK[])",
+    )
+    search_args = connection_mock.uid.call_args_list[1].args
+    assert search_args[:3] == ("SEARCH", "OR", "OR")
+    assert search_args.count('"<root@example.com>"') == 3
+    assert connection_mock.uid.call_args_list[2].args == (
+        "FETCH",
+        "5,9",
+        "(UID FLAGS RFC822.SIZE BODY.PEEK[])",
+    )
+
+
 @pytest.mark.asyncio
 async def test_search_compiles_structured_filters() -> None:
     client = make_client()

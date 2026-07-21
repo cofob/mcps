@@ -25,6 +25,7 @@ FETCH_UID_PATTERN = re.compile(rb"\bUID (\d+)\b")
 FETCH_SIZE_PATTERN = re.compile(rb"\bRFC822\.SIZE (\d+)\b")
 FETCH_FLAGS_PATTERN = re.compile(rb"\bFLAGS \(([^)]*)\)")
 LIST_PATTERN = re.compile(rb'^\((?P<flags>[^)]*)\) (?P<delimiter>NIL|"(?:\\.|[^"])*") (?P<name>.+)$')
+MESSAGE_ID_PATTERN = re.compile(r"<[^<>\s]+>")
 
 
 class _HtmlTextExtractor(HTMLParser):
@@ -126,6 +127,12 @@ def _format_date(value: str | None) -> str | None:
         return parsedate_to_datetime(value).isoformat()
     except (TypeError, ValueError, OverflowError):
         return value.strip() or None
+
+
+def _message_ids(value: str | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    return tuple(dict.fromkeys(MESSAGE_ID_PATTERN.findall(value)))
 
 
 def _metadata_value(pattern: re.Pattern[bytes], metadata: bytes, *, default: int = 0) -> int:
@@ -377,9 +384,76 @@ class EmailClient:
     async def get_message(self, account_name: str, folder: str, uid: int) -> ParsedMessage:
         return await asyncio.to_thread(self._get_message, account_name, folder, uid)
 
+    async def get_thread(
+        self,
+        account_name: str,
+        folder: str,
+        uid: int,
+        *,
+        limit: int,
+    ) -> list[ParsedMessage]:
+        return await asyncio.to_thread(self._get_thread, account_name, folder, uid, limit)
+
     def _get_message(self, account_name: str, folder: str, uid: int) -> ParsedMessage:
         raw, metadata = self._fetch_message(account_name, folder, uid)
         return self._parse_message(raw, metadata)
+
+    def _get_thread(self, account_name: str, folder: str, uid: int, limit: int) -> list[ParsedMessage]:
+        self._validate_page(limit, 0)
+        if uid < 1:
+            raise UpstreamValidationError("uid must be positive.")
+        account = self._account(account_name)
+        with self._imap(account) as connection:
+            self._select(connection, folder)
+            messages = self._fetch_selected_messages(connection, folder, (uid,))
+            target = messages.get(uid)
+            if target is None:
+                raise UpstreamValidationError(f"Message UID {uid} was not found in {folder!r}.")
+
+            pending_ids = list(self._thread_message_ids(target))
+            searched_ids: set[str] = set()
+            while pending_ids and len(messages) < limit:
+                message_id = pending_ids.pop(0)
+                if message_id in searched_ids:
+                    continue
+                searched_ids.add(message_id)
+                quoted_id = self._quote_search(message_id)
+                status, search_data = connection.uid(
+                    "SEARCH",
+                    "OR",
+                    "OR",
+                    "HEADER",
+                    "MESSAGE-ID",
+                    quoted_id,
+                    "HEADER",
+                    "IN-REPLY-TO",
+                    quoted_id,
+                    "HEADER",
+                    "REFERENCES",
+                    quoted_id,
+                )
+                if status != "OK":
+                    raise UpstreamValidationError("IMAP thread SEARCH failed.")
+                raw_uids = search_data[0] if search_data else b""
+                uid_values = raw_uids.split() if isinstance(raw_uids, bytes) else []
+                matching_uids = [
+                    int(raw_uid) for raw_uid in uid_values if raw_uid.isdigit() and int(raw_uid) not in messages
+                ]
+                available = limit - len(messages)
+                fetched = self._fetch_selected_messages(connection, folder, tuple(matching_uids[:available]))
+                for fetched_uid, message in fetched.items():
+                    messages[fetched_uid] = message
+                    pending_ids.extend(
+                        identifier for identifier in self._thread_message_ids(message) if identifier not in searched_ids
+                    )
+        return [messages[message_uid] for message_uid in sorted(messages)]
+
+    @staticmethod
+    def _thread_message_ids(message: ParsedMessage) -> tuple[str, ...]:
+        values = message.references + message.in_reply_to
+        if message.summary.message_id is not None:
+            values += _message_ids(message.summary.message_id)
+        return tuple(dict.fromkeys(values))
 
     def _fetch_message(self, account_name: str, folder: str, uid: int) -> tuple[bytes, bytes]:
         if uid < 1:
@@ -393,13 +467,38 @@ class EmailClient:
         for part in cast(list[FetchPart], raw_fetch):
             if not isinstance(part, tuple):
                 continue
-            size = _metadata_value(FETCH_SIZE_PATTERN, part[0], default=len(part[1]))
-            if size > self._settings.email_max_message_bytes:
-                raise UpstreamValidationError(
-                    f"Message is {size} bytes; limit is {self._settings.email_max_message_bytes} bytes.",
-                )
+            self._validate_message_size(part[0], part[1])
             return part[1], part[0]
         raise UpstreamValidationError(f"Message UID {uid} was not found in {folder!r}.")
+
+    def _fetch_selected_messages(
+        self,
+        connection: imaplib.IMAP4,
+        folder: str,
+        uids: tuple[int, ...],
+    ) -> dict[int, ParsedMessage]:
+        if not uids:
+            return {}
+        uid_set = ",".join(str(message_uid) for message_uid in uids)
+        status, raw_fetch = connection.uid("FETCH", uid_set, "(UID FLAGS RFC822.SIZE BODY.PEEK[])")
+        if status != "OK":
+            raise UpstreamValidationError(f"Messages could not be fetched from {folder!r}.")
+        messages: dict[int, ParsedMessage] = {}
+        for part in cast(list[FetchPart], raw_fetch):
+            if not isinstance(part, tuple):
+                continue
+            self._validate_message_size(part[0], part[1])
+            parsed = self._parse_message(part[1], part[0])
+            if parsed.summary.uid:
+                messages[parsed.summary.uid] = parsed
+        return messages
+
+    def _validate_message_size(self, metadata: bytes, raw: bytes) -> None:
+        size = _metadata_value(FETCH_SIZE_PATTERN, metadata, default=len(raw))
+        if size > self._settings.email_max_message_bytes:
+            raise UpstreamValidationError(
+                f"Message is {size} bytes; limit is {self._settings.email_max_message_bytes} bytes.",
+            )
 
     def _parse_message(self, raw: bytes, metadata: bytes) -> ParsedMessage:
         message = BytesParser(policy=policy.default).parsebytes(raw)
@@ -456,6 +555,9 @@ class EmailClient:
             body=body,
             body_format=body_format,
             attachments=tuple(attachments),
+            reply_to=_decode_header(str(message["Reply-To"]) if message["Reply-To"] is not None else None),
+            in_reply_to=_message_ids(str(message["In-Reply-To"]) if message["In-Reply-To"] is not None else None),
+            references=_message_ids(str(message["References"]) if message["References"] is not None else None),
         )
 
     async def send_raw(

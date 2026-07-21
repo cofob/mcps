@@ -18,9 +18,11 @@ IMAP/SMTP email MCP server for multiple named accounts.
 
 Highlights:
 
-- list folders and list, search, or read messages without changing read state
+- list folders and list, search, read, or fetch RFC-header-linked message threads without changing read state
 - fetch complete attachments as MCP binary resources
 - send plain-text/HTML messages from a configured default or per-message From address with bounded base64 attachments
+- reply or reply-all with recipients derived from the source message and standards-compliant `In-Reply-To` and
+  `References` headers
 - sign outgoing MIME bodies and attachments with OpenPGP/MIME through a configured GPG keyring and agent
 - expose mandatory confirmation and direct-request privacy rules plus a detailed `skill://email-mcp/usage` resource
 

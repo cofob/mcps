@@ -1,5 +1,6 @@
 import base64
 import binascii
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email import policy
@@ -11,6 +12,7 @@ from email_mcp.models import DecodedAttachment, OutgoingAttachment
 from mcp_common import UpstreamValidationError
 
 SMTP_POLICY = policy.SMTP.clone(max_line_length=78)
+MESSAGE_ID_PATTERN = re.compile(r"^<[^<>\s]+>$")
 
 
 @dataclass(frozen=True)
@@ -151,13 +153,15 @@ def serialize_body(body: EmailMessage) -> bytes:
     return body.as_bytes(policy=SMTP_POLICY)
 
 
-def _set_headers(
+def _set_headers(  # noqa: PLR0913
     message: EmailMessage,
     account: EmailAccountSettings,
     from_address: str | None,
     addresses: PreparedAddresses,
     subject: str,
     reply_to: str | None,
+    in_reply_to: str | None,
+    references: tuple[str, ...],
 ) -> tuple[str, str]:
     if "\r" in subject or "\n" in subject:
         raise UpstreamValidationError("Subject must not contain newlines.")
@@ -173,10 +177,22 @@ def _set_headers(
     if reply_to is not None:
         reply_header, _ = _validate_address(reply_to)
         message["Reply-To"] = reply_header
+    if in_reply_to is not None:
+        _validate_message_id(in_reply_to)
+        message["In-Reply-To"] = in_reply_to
+    if references:
+        for reference in references:
+            _validate_message_id(reference)
+        message["References"] = " ".join(dict.fromkeys(references))
     message["Subject"] = subject
     message["Date"] = format_datetime(datetime.now(UTC))
     message["Message-ID"] = message_id
     return message_id, sender_address
+
+
+def _validate_message_id(value: str) -> None:
+    if MESSAGE_ID_PATTERN.fullmatch(value) is None:
+        raise UpstreamValidationError(f"Invalid RFC message identifier: {value!r}.")
 
 
 def build_message(  # noqa: PLR0913
@@ -189,13 +205,33 @@ def build_message(  # noqa: PLR0913
     signature: bytes | None,
     *,
     from_address: str | None = None,
+    in_reply_to: str | None = None,
+    references: tuple[str, ...] = (),
 ) -> PreparedMessage:
     if signature is None:
         message = body
-        message_id, sender = _set_headers(message, account, from_address, addresses, subject, reply_to)
+        message_id, sender = _set_headers(
+            message,
+            account,
+            from_address,
+            addresses,
+            subject,
+            reply_to,
+            in_reply_to,
+            references,
+        )
     else:
         message = EmailMessage(policy=SMTP_POLICY)
-        message_id, sender = _set_headers(message, account, from_address, addresses, subject, reply_to)
+        message_id, sender = _set_headers(
+            message,
+            account,
+            from_address,
+            addresses,
+            subject,
+            reply_to,
+            in_reply_to,
+            references,
+        )
         message.set_type("multipart/signed")
         message.set_param("protocol", "application/pgp-signature")
         message.set_param("micalg", "pgp-sha256")

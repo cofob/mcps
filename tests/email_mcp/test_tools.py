@@ -27,10 +27,12 @@ async def test_email_tools_expose_expected_metadata() -> None:
     assert set(tools) == {
         "email_get_attachment",
         "email_get_message",
+        "email_get_thread",
         "email_list_accounts",
         "email_list_folders",
         "email_list_messages",
         "email_search_messages",
+        "email_reply_message",
         "email_send_message",
     }
     read_tool = tools["email_get_message"]
@@ -43,6 +45,7 @@ async def test_email_tools_expose_expected_metadata() -> None:
         "email_list_folders",
         "email_list_messages",
         "email_search_messages",
+        "email_get_thread",
     ):
         assert "directly request" in (tools[tool_name].description or "")
     send_tool = tools["email_send_message"]
@@ -54,6 +57,13 @@ async def test_email_tools_expose_expected_metadata() -> None:
     assert "explicit confirmation" in (send_tool.description or "")
     assert "complete bodies" in (send_tool.description or "")
     assert "from_address" in send_tool.parameters["properties"]
+    reply_tool = tools["email_reply_message"]
+    assert reply_tool.annotations is not None
+    assert reply_tool.annotations.readOnlyHint is False
+    assert reply_tool.annotations.idempotentHint is False
+    assert reply_tool.tags >= {"mutate", "write", "thread", "remote-service", "open-world"}
+    assert "threading headers" in (reply_tool.description or "")
+    assert "reply_all" in reply_tool.parameters["properties"]
 
 
 @pytest.mark.asyncio

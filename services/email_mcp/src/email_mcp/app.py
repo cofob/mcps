@@ -49,8 +49,10 @@ def _make_tool_specs(service: EmailService) -> list[ToolSpec]:
         _tool_spec(messages.list_messages, "email_list_messages", "read", "mail"),
         _tool_spec(messages.search_messages, "email_search_messages", "read", "mail", "search"),
         _tool_spec(messages.get_message, "email_get_message", "read", "mail"),
+        _tool_spec(messages.get_thread, "email_get_thread", "read", "mail", "thread"),
         _tool_spec(messages.get_attachment, "email_get_attachment", "read", "mail", "attachments"),
         _tool_spec(send.send_message, "email_send_message", "mutate", "mail", "send"),
+        _tool_spec(send.reply_message, "email_reply_message", "mutate", "mail", "send", "thread"),
     ]
 
 

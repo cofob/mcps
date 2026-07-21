@@ -1,7 +1,8 @@
 # email-mcp
 
 Email MCP server using standard IMAP for reading and SMTP for sending. It supports multiple named accounts, verified
-implicit TLS or STARTTLS, MIME attachments, and optional OpenPGP/MIME signatures.
+implicit TLS or STARTTLS, RFC-header-based thread discovery and replies, MIME attachments, and optional OpenPGP/MIME
+signatures.
 
 All IMAP mailbox selection is read-only and message fetches use PEEK semantics. Listing, searching, reading, and
 downloading attachments never mark messages as read.
@@ -13,9 +14,13 @@ downloading attachments never mark messages as read.
 - `email_list_messages`: page through messages newest UID first
 - `email_search_messages`: combine sender, recipient, subject, text, date, and unread filters
 - `email_get_message`: read normalized headers, text body, and attachment metadata by folder-scoped UID
+- `email_get_thread`: fetch messages linked to one folder-scoped UID through `Message-ID`, `In-Reply-To`, and
+  `References`, ordered by ascending UID
 - `email_get_attachment`: return one indexed attachment as an MCP binary `EmbeddedResource`
 - `email_send_message`: send text/HTML email from the configured default or a per-message From address, with attachments
   and optional OpenPGP/MIME signing
+- `email_reply_message`: derive reply or reply-all recipients and subject from a source message, then send with correct
+  `In-Reply-To` and `References` headers
 
 Every tool that accesses mail requires an explicit `account` name.
 For maximum portability across IMAP servers, textual search filters currently accept ASCII text.
@@ -26,14 +31,21 @@ The server publishes mandatory agent instructions and a detailed Markdown skill 
 `skill://email-mcp/usage`. The resource covers consent boundaries, folder-scoped UIDs, efficient search filters,
 attachments, SMTP failure handling, and OpenPGP/MIME signing.
 
-- Agents may call account, folder, or message list tools and `email_search_messages` only when the user directly asks
-  to list, browse, search, find, or check mail or mail configuration. They must not inspect mail proactively.
-- Before every `email_send_message` call, the agent must show the exact account, resolved From address, recipients,
-  subject, complete text and HTML bodies, attachment names, and resolved signing choice, then obtain explicit
-  confirmation in a subsequent turn.
+- Agents may call account, folder, or message list tools, `email_search_messages`, and `email_get_thread` only when the
+  user directly asks to list, browse, search, find, check, or read that mail or mail configuration. They must not
+  inspect mail proactively.
+- Before every `email_send_message` or `email_reply_message` call, the agent must show the exact account, resolved From
+  address, recipients, subject, complete text and HTML bodies, attachment names, and resolved signing choice, then
+  obtain explicit confirmation in a subsequent turn. Reply previews must also identify the source folder and UID and
+  whether reply-all is enabled.
 - Confirmation applies to one exact message. Any change requires a new complete preview and confirmation.
 - Because SMTP submission is non-idempotent, agents must not automatically retry a send whose delivery status may be
   ambiguous.
+
+Thread discovery is portable and does not require the optional IMAP `THREAD` extension. It follows RFC message
+identifiers only within the selected folder, so use a provider's all-mail folder when both received and sent copies
+must be included. `limit` is bounded by `EMAIL_MAX_RESULTS`; each fetched message remains subject to
+`EMAIL_MAX_MESSAGE_BYTES`.
 
 ## Account Configuration
 
@@ -99,8 +111,9 @@ not accepted, so behavior is identical over stdio and HTTP.
 
 ## OpenPGP/MIME Signing
 
-When an account has `gpg_key_fingerprint`, `email_send_message` signs by default. Pass `sign=false` to send that message
-unsigned. Pass `sign=true` to require signing explicitly. A missing key or any GPG error aborts before SMTP submission.
+When an account has `gpg_key_fingerprint`, `email_send_message` and `email_reply_message` sign by default. Pass
+`sign=false` to send that message unsigned. Pass `sign=true` to require signing explicitly. A missing key or any GPG
+error aborts before SMTP submission.
 
 The fingerprint must be the full 40- or 64-character fingerprint. The service invokes `EMAIL_GPG_BINARY` (`gpg` by
 default) against the account's `gpg_home`, or the process's normal GPG home when omitted. Private keys and unlocking are

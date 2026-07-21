@@ -81,6 +81,9 @@ class ParsedMessage:
     body: str
     body_format: str
     attachments: tuple[Attachment, ...]
+    reply_to: str = ""
+    in_reply_to: tuple[str, ...] = ()
+    references: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
