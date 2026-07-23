@@ -114,6 +114,7 @@ async def test_reconfigure_email_profile_keeps_password_and_updates_default_from
                         "username": "alice@example.com",
                         "password": "existing-password",
                         "default_from_address": "alice@example.com",
+                        "sent_folder": "Sent Items",
                     }
                 }
             )
@@ -150,6 +151,7 @@ async def test_reconfigure_email_profile_keeps_password_and_updates_default_from
     existing_accounts = json.loads(existing.secret_values["EMAIL_ACCOUNTS"])
     assert accounts["personal"]["default_from_address"] == "support@example.com"
     assert accounts["personal"]["password"] == existing_accounts["personal"]["password"]
+    assert accounts["personal"]["sent_folder"] == "Sent Items"
     assert prompt.secret_questions == []
 
 

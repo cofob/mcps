@@ -32,6 +32,7 @@ class EmailAccountSettings(BaseModel):
     smtp_password: SecretStr | None = None
     default_from_address: str = Field(validation_alias=AliasChoices("default_from_address", "from_address"))
     from_name: str | None = None
+    sent_folder: str | None = None
     gpg_key_fingerprint: str | None = None
     gpg_home: Path | None = None
 
@@ -55,6 +56,18 @@ class EmailAccountSettings(BaseModel):
             return None
         if "\r" in stripped or "\n" in stripped:
             raise ValueError("Header values must not contain newlines.")
+        return stripped
+
+    @field_validator("sent_folder")
+    @classmethod
+    def validate_sent_folder(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if "\r" in stripped or "\n" in stripped or "\x00" in stripped:
+            raise ValueError("Mailbox names must not contain control characters.")
         return stripped
 
     @field_validator("default_from_address")

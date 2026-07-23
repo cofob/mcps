@@ -196,6 +196,7 @@ class EmailClient:
         account = self._account(account_name)
         with self._imap(account) as imap_connection:
             self._select(imap_connection, "INBOX")
+            self._select(imap_connection, self._resolve_sent_folder(imap_connection, account))
         with self._smtp(account) as smtp_connection:
             status, _ = smtp_connection.noop()
             if status != 250:
@@ -235,31 +236,20 @@ class EmailClient:
                     connection.logout()
 
     @staticmethod
-    def _select(connection: imaplib.IMAP4, folder: str) -> None:
+    def _mailbox_argument(folder: str) -> str:
         if "\r" in folder or "\n" in folder or "\x00" in folder:
             raise UpstreamValidationError("Mailbox names must not contain control characters.")
         encoded_folder = _encode_modified_utf7(folder).replace("\\", "\\\\").replace('"', '\\"')
-        status, _ = connection.select(f'"{encoded_folder}"', readonly=True)
+        return f'"{encoded_folder}"'
+
+    @classmethod
+    def _select(cls, connection: imaplib.IMAP4, folder: str) -> None:
+        status, _ = connection.select(cls._mailbox_argument(folder), readonly=True)
         if status != "OK":
             raise UpstreamValidationError(f"Could not select mailbox {folder!r}.")
 
-    def _validate_page(self, limit: int, offset: int) -> None:
-        if limit < 1 or limit > self._settings.email_max_results:
-            raise UpstreamValidationError(
-                f"limit must be between 1 and {self._settings.email_max_results}.",
-            )
-        if offset < 0:
-            raise UpstreamValidationError("offset must be non-negative.")
-
-    async def list_folders(self, account_name: str) -> list[MailboxFolder]:
-        return await asyncio.to_thread(self._list_folders, account_name)
-
-    def _list_folders(self, account_name: str) -> list[MailboxFolder]:
-        account = self._account(account_name)
-        with self._imap(account) as connection:
-            status, data = connection.list()
-            if status != "OK":
-                raise UpstreamServerError("IMAP LIST failed.")
+    @staticmethod
+    def _folders_from_list(data: Sequence[FetchPart]) -> list[MailboxFolder]:
         folders: list[MailboxFolder] = []
         for raw in data:
             if not isinstance(raw, bytes):
@@ -278,6 +268,48 @@ class EmailClient:
                     flags=tuple(flag.decode("ascii", errors="replace") for flag in match.group("flags").split()),
                 )
             )
+        return folders
+
+    def _resolve_sent_folder(
+        self,
+        connection: imaplib.IMAP4,
+        account: EmailAccountSettings,
+    ) -> str:
+        if account.sent_folder is not None:
+            return account.sent_folder
+        status, data = connection.list()
+        if status != "OK":
+            raise UpstreamServerError("IMAP LIST failed while locating the Sent mailbox.")
+        folders = self._folders_from_list(data)
+        for folder in folders:
+            if any(flag.casefold() == r"\sent" for flag in folder.flags):
+                return folder.name
+        common_names = {"sent", "sent mail", "sent messages", "sent items"}
+        for folder in folders:
+            if folder.name.casefold() in common_names:
+                return folder.name
+        raise UpstreamValidationError(
+            "Could not locate the Sent mailbox. Configure sent_folder for this account.",
+        )
+
+    def _validate_page(self, limit: int, offset: int) -> None:
+        if limit < 1 or limit > self._settings.email_max_results:
+            raise UpstreamValidationError(
+                f"limit must be between 1 and {self._settings.email_max_results}.",
+            )
+        if offset < 0:
+            raise UpstreamValidationError("offset must be non-negative.")
+
+    async def list_folders(self, account_name: str) -> list[MailboxFolder]:
+        return await asyncio.to_thread(self._list_folders, account_name)
+
+    def _list_folders(self, account_name: str) -> list[MailboxFolder]:
+        account = self._account(account_name)
+        with self._imap(account) as connection:
+            status, data = connection.list()
+            if status != "OK":
+                raise UpstreamServerError("IMAP LIST failed.")
+        folders = self._folders_from_list(data)
         return sorted(folders, key=lambda item: item.name.casefold())
 
     async def list_messages(
@@ -578,6 +610,28 @@ class EmailClient:
                 raise UpstreamValidationError(
                     f"SMTP refused recipients: {refused_addresses}. Other recipients may have received the message.",
                 )
+        try:
+            self._save_to_sent(account, raw_message)
+        except (UpstreamAuthError, UpstreamServerError, UpstreamValidationError) as exc:
+            raise UpstreamServerError(
+                "Email was accepted by SMTP but could not be saved to the Sent mailbox. "
+                "Do not retry automatically because recipients may receive a duplicate.",
+            ) from exc
+
+    def _save_to_sent(self, account: EmailAccountSettings, raw_message: bytes) -> None:
+        with self._imap(account) as connection:
+            sent_folder = self._resolve_sent_folder(connection, account)
+            status, _ = cast(
+                tuple[str, list[bytes | None]],
+                connection.append(
+                    self._mailbox_argument(sent_folder),
+                    r"\Seen",
+                    "",
+                    raw_message,
+                ),
+            )
+            if status != "OK":
+                raise UpstreamServerError(f"IMAP APPEND to mailbox {sent_folder!r} failed.")
 
     @contextmanager
     def _smtp(self, account: EmailAccountSettings) -> Iterator[smtplib.SMTP]:

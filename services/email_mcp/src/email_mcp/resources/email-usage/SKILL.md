@@ -60,7 +60,9 @@ new complete preview and confirmation. Never send a blank or placeholder body un
 explicitly.
 
 SMTP sending is non-idempotent. Never automatically retry a failed send after submission may have begun. If the result
-is ambiguous, explain that delivery may have occurred and let the user verify externally.
+is ambiguous, explain that delivery may have occurred and let the user verify externally. A successful SMTP submission
+is followed by an IMAP copy to the configured or discovered Sent mailbox. If only that copy fails, recipients may still
+have received the message, so do not retry the send.
 
 ## Replies and threading
 

@@ -11,9 +11,10 @@ from pydantic import SecretStr
 
 from email_mcp.client import EmailClient
 from email_mcp.config import EmailAccountSettings, EmailSettings
+from mcp_common import UpstreamServerError
 
 
-def make_client() -> EmailClient:
+def make_client(*, sent_folder: str | None = None) -> EmailClient:
     return EmailClient(
         EmailSettings(
             EMAIL_ACCOUNTS={
@@ -23,6 +24,7 @@ def make_client() -> EmailClient:
                     username="alice@example.com",
                     password=SecretStr("secret"),
                     default_from_address="alice@example.com",
+                    sent_folder=sent_folder,
                 )
             }
         )
@@ -43,6 +45,7 @@ def test_validate_account_checks_readonly_inbox_and_smtp_noop_without_sending() 
     client = make_client()
     imap_mock = Mock(spec=imaplib.IMAP4)
     imap_mock.select.return_value = ("OK", [b"1"])
+    imap_mock.list.return_value = ("OK", [b'(\\HasNoChildren \\Sent) "/" "Sent"'])
     smtp_mock = Mock(spec=smtplib.SMTP)
     smtp_mock.noop.return_value = (250, b"OK")
     imap_connection = cast(imaplib.IMAP4, imap_mock)
@@ -54,7 +57,11 @@ def test_validate_account_checks_readonly_inbox_and_smtp_noop_without_sending() 
     ):
         client._validate_account("work")
 
-    imap_mock.select.assert_called_once_with('"INBOX"', readonly=True)
+    assert imap_mock.select.call_args_list == [
+        (('"INBOX"',), {"readonly": True}),
+        (('"Sent"',), {"readonly": True}),
+    ]
+    imap_mock.list.assert_called_once_with()
     smtp_mock.noop.assert_called_once_with()
     smtp_mock.sendmail.assert_not_called()
 
@@ -63,12 +70,69 @@ def test_send_raw_uses_resolved_sender_as_smtp_envelope_from() -> None:
     client = make_client()
     smtp_mock = Mock(spec=smtplib.SMTP)
     smtp_mock.sendmail.return_value = {}
+    imap_mock = Mock(spec=imaplib.IMAP4)
+    imap_mock.list.return_value = (
+        "OK",
+        [
+            b'(\\HasNoChildren) "/" "INBOX"',
+            b'(\\HasNoChildren \\Sent) "/" "Sent Items"',
+        ],
+    )
+    imap_mock.append.return_value = ("OK", [b"APPEND completed"])
     smtp_connection = cast(smtplib.SMTP, smtp_mock)
+    imap_connection = cast(imaplib.IMAP4, imap_mock)
 
-    with patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)):
+    with (
+        patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)),
+        patch.object(client, "_imap", side_effect=lambda _: mocked_imap(imap_connection)),
+    ):
         client._send_raw("work", "support@example.com", b"message", ("bob@example.com",))
 
     smtp_mock.sendmail.assert_called_once_with("support@example.com", ["bob@example.com"], b"message")
+    imap_mock.append.assert_called_once_with('"Sent Items"', r"\Seen", "", b"message")
+
+
+def test_send_raw_uses_configured_sent_folder() -> None:
+    client = make_client(sent_folder="Gesendet")
+    smtp_mock = Mock(spec=smtplib.SMTP)
+    smtp_mock.sendmail.return_value = {}
+    imap_mock = Mock(spec=imaplib.IMAP4)
+    imap_mock.append.return_value = ("OK", [b"APPEND completed"])
+    smtp_connection = cast(smtplib.SMTP, smtp_mock)
+    imap_connection = cast(imaplib.IMAP4, imap_mock)
+
+    with (
+        patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)),
+        patch.object(client, "_imap", side_effect=lambda _: mocked_imap(imap_connection)),
+    ):
+        client._send_raw("work", "alice@example.com", b"message", ("bob@example.com",))
+
+    imap_mock.list.assert_not_called()
+    imap_mock.append.assert_called_once_with('"Gesendet"', r"\Seen", "", b"message")
+
+
+def test_send_raw_reports_smtp_success_when_sent_copy_fails() -> None:
+    client = make_client()
+    smtp_mock = Mock(spec=smtplib.SMTP)
+    smtp_mock.sendmail.return_value = {}
+    imap_mock = Mock(spec=imaplib.IMAP4)
+    imap_mock.list.return_value = ("OK", [b'(\\HasNoChildren \\Sent) "/" "Sent"'])
+    imap_mock.append.return_value = ("NO", [b"APPEND failed"])
+    smtp_connection = cast(smtplib.SMTP, smtp_mock)
+    imap_connection = cast(imaplib.IMAP4, imap_mock)
+
+    with (
+        patch.object(client, "_smtp", side_effect=lambda _: mocked_smtp(smtp_connection)),
+        patch.object(client, "_imap", side_effect=lambda _: mocked_imap(imap_connection)),
+        pytest.raises(
+            UpstreamServerError,
+            match="accepted by SMTP but could not be saved",
+        ),
+    ):
+        client._send_raw("work", "alice@example.com", b"message", ("bob@example.com",))
+
+    smtp_mock.sendmail.assert_called_once()
+    imap_mock.append.assert_called_once_with('"Sent"', r"\Seen", "", b"message")
 
 
 def test_list_messages_selects_readonly_and_fetches_peek_headers() -> None:

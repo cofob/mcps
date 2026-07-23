@@ -279,6 +279,9 @@ async def _reconfigure_email_account(prompt: PromptIO, name: str, current: JsonO
     from_name = await prompt.text("Display name (optional)", default=_string_value(current, "from_name"))
     if from_name:
         account["from_name"] = from_name
+    sent_folder = _string_value(current, "sent_folder")
+    if sent_folder:
+        account["sent_folder"] = sent_folder
     existing_smtp_username = _string_value(current, "smtp_username") or None
     existing_smtp_password = _string_value(current, "smtp_password") or None
     if await prompt.confirm("Use different SMTP credentials?", default=existing_smtp_username is not None):

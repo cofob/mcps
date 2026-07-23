@@ -240,6 +240,8 @@ uv run --package email-mcp email-mcp --transport http
 See [the email service README](/Users/cofob/Development/mcps/services/email_mcp) for attachments, limits, and GPG setup.
 Email agents must preview complete message bodies and receive explicit confirmation before each send. Account, folder,
 and message listing and message search are allowed only when directly requested by the user.
+After SMTP submission, `email-mcp` saves a copy through IMAP in the discovered Sent mailbox; set the optional
+per-account `sent_folder` field when the server does not advertise a standard Sent folder.
 
 ### Navidrome
 

@@ -105,6 +105,7 @@ def format_sent(
             f"- recipients: {', '.join(recipients)}",
             f"- attachments: {attachment_count}",
             f"- OpenPGP/MIME signed: {str(signed).lower()}",
+            "- saved to Sent: true",
         ]
     )
 
@@ -129,5 +130,6 @@ def format_reply_sent(  # noqa: PLR0913
             f"- recipients: {', '.join(recipients)}",
             f"- attachments: {attachment_count}",
             f"- OpenPGP/MIME signed: {str(signed).lower()}",
+            "- saved to Sent: true",
         ]
     )

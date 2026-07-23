@@ -31,7 +31,21 @@ def test_email_settings_parse_named_accounts_from_environment(monkeypatch: pytes
     assert account.resolved_smtp_username == "alice@example.com"
     assert account.resolved_smtp_password.get_secret_value() == "secret"
     assert account.default_from_address == "alice@example.com"
+    assert account.sent_folder is None
     assert settings.mcp_transport is TransportMode.STDIO
+
+
+def test_email_settings_accept_sent_folder_override() -> None:
+    account = EmailAccountSettings(
+        imap_host="imap.example.com",
+        smtp_host="smtp.example.com",
+        username="alice@example.com",
+        password=SecretStr("secret"),
+        default_from_address="alice@example.com",
+        sent_folder="  Sent Items  ",
+    )
+
+    assert account.sent_folder == "Sent Items"
 
 
 def test_email_settings_accept_legacy_from_address_key() -> None:

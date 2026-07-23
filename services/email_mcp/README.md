@@ -79,6 +79,7 @@ export EMAIL_ACCOUNTS='{
     "smtp_password": "optional-separate-relay-password",
     "default_from_address": "alice@example.com",
     "from_name": "Alice",
+    "sent_folder": "Sent",
     "gpg_key_fingerprint": "0123456789ABCDEF0123456789ABCDEF01234567",
     "gpg_home": "/home/alice/.gnupg"
   }
@@ -90,6 +91,11 @@ username/password. `default_from_address` is used when `email_send_message.from_
 `from_address` configuration key remains accepted. A per-message override is applied to both the MIME `From` header and
 SMTP envelope sender, and the SMTP provider may reject identities that are not authorized for the account. Plaintext
 protocol connections and disabled certificate verification are not supported.
+
+After SMTP accepts a message, the service saves the exact MIME message to the IMAP Sent mailbox with the `\Seen` flag.
+It discovers that mailbox from the standard `\Sent` special-use flag, with common English names as a fallback. Set the
+optional `sent_folder` account field when the server does not advertise a recognizable Sent mailbox. If SMTP succeeds
+but the IMAP copy fails, the send call reports that delivery occurred and must not be retried automatically.
 
 ## Attachments
 
